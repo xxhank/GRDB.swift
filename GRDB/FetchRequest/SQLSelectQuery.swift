@@ -16,6 +16,7 @@ public struct _SQLSelectQuery {
     var reversed: Bool
     var havingExpression: _SQLExpression?
     var limit: _SQLLimit?
+    var indexedSubrows: [(name: String, index: Int)] = []
     
     init(
         select selection: [_SQLSelectable],
@@ -180,6 +181,52 @@ public struct _SQLSelectQuery {
         query.sortDescriptors = []
         return query
     }
+    
+    private var tableName: String? {
+        return source?.tableName
+    }
+    
+    mutating func addSuffixSubrow(named name: String) {
+        indexedSubrows.append((name: name, index: selection.count))
+    }
+    
+    func adapter(statement: SelectStatement) throws -> RowAdapter? {
+        guard !indexedSubrows.isEmpty else {
+            return nil
+        }
+        
+        var columnIndex = 0
+        var columnIndexForSelectionIndex: [Int: Int] = [:]
+        for (selectionIndex, selectable) in selection.enumerate() {
+            columnIndexForSelectionIndex[selectionIndex] = columnIndex
+            switch selectable.sqlSelectableKind {
+            case .Expression:
+                columnIndex += 1
+            case .Star(let sourceName):
+                guard let tableName = tableNameForSource(named: sourceName) else {
+                    fatalError("No table for name \(sourceName)")
+                }
+                columnIndex += try statement.database.numberOfColumns(tableName)
+            }
+        }
+        
+        let subrowAdapters = indexedSubrows.map { (subrowName, selectionIndex) -> (String, RowAdapter) in
+            let columnIndex = columnIndexForSelectionIndex[selectionIndex]!
+            return (subrowName, RowAdapter(fromColumnAtIndex: columnIndex))
+        }
+        return RowAdapter(subrows: Dictionary(keyValueSequence: subrowAdapters))
+    }
+    
+    func tableNameForSource(named sourceName: String?) -> String? {
+        if let sourceName = sourceName {
+            guard let source = source else {
+                fatalError("Missing query source")
+            }
+            return source.tableNameForSource(named: sourceName)
+        } else {
+            return source?.tableName
+        }
+    }
 }
 
 
@@ -188,6 +235,56 @@ public struct _SQLSelectQuery {
 indirect enum _SQLSource {
     case Table(name: String, alias: String?)
     case Query(query: _SQLSelectQuery, alias: String?)
+    case JoinHasOne(baseSource: _SQLSource, association: HasOneAssociation)
+//    case Join(baseSource: _SQLSource, joinedTableName: String, alias: String?, condition: _SQLExpression)
+    
+    var tableName: String? {
+        switch self {
+        case .Table(let tableName, _):
+            return tableName
+        case .Query(let query, _):
+            return query.tableName
+        case .JoinHasOne(let baseSource, let association):
+            return baseSource.tableName
+//        case .Join(let baseSource, _, _, _):
+//            return baseSource.tableName
+        }
+    }
+    
+    func tableNameForSource(named sourceName: String?) -> String? {
+        switch self {
+        case .Table(let tableName, let alias):
+            if let alias = alias {
+                if alias == sourceName {
+                    return tableName
+                }
+            } else if sourceName == tableName {
+                return tableName
+            }
+            return nil
+        case .Query(let query, let alias):
+            if alias == sourceName {
+                return query.tableName
+            }
+            return nil
+        case .JoinHasOne(let baseSource, let association):
+            if sourceName == association.name {
+                return association.childTable
+            }
+            if sourceName == association.childTable {
+                return association.childTable
+            }
+            return baseSource.tableNameForSource(named: sourceName)
+//        case .Join(let baseSource, let joinedTableName, let alias, condition: _):
+//            if alias == sourceName {
+//                return joinedTableName
+//            }
+//            if joinedTableName == sourceName {
+//                return joinedTableName
+//            }
+//            return baseSource.tableNameForSource(named: sourceName)
+        }
+    }
     
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
         switch self {
@@ -203,6 +300,23 @@ indirect enum _SQLSource {
             } else {
                 return try "(" + query.sql(db, &bindings) + ")"
             }
+        case .JoinHasOne(let baseSource, let association):
+            var sql = try baseSource.sql(db, &bindings)
+            sql += " JOIN \(association.childTable) AS \(association.name)"
+            sql += " ON "
+            // TODO: foreign key
+            sql += try condition.sql(db, &bindings)
+            return sql
+            break
+//        case .Join(let baseSource, let joinedTableName, let alias, let condition):
+//            var sql = try baseSource.sql(db, &bindings)
+//            sql += " JOIN \(joinedTableName)"
+//            if let alias = alias {
+//                sql += " \(alias)"
+//            }
+//            sql += " ON "
+//            sql += try condition.sql(db, &bindings)
+//            return sql
         }
     }
 }

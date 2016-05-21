@@ -141,6 +141,16 @@ public struct RowAdapter {
             subRowAdapters: subRowAdapters)
     }
     
+    init(fromColumnAtIndex index: Int) {
+        impl = SuffixRowAdapterImpl(index: index)
+    }
+    
+    init(subrows subRowAdapters: [String: RowAdapter]) {
+        impl = NestedRowAdapterImpl(
+            mainRowAdapter: RowAdapter(impl: IdentityRowAdapterImpl()),
+            subRowAdapters: subRowAdapters)
+    }
+    
     private init(impl: RowAdapterImpl) {
         self.impl = impl
     }
@@ -186,6 +196,14 @@ extension RowAdapterImpl {
 private struct IdentityRowAdapterImpl: RowAdapterImpl {
     func columnBaseIndexes(statement statement: SelectStatement) throws -> [(Int, String)] {
         return Array(statement.columnNames.enumerate())
+    }
+}
+
+private struct SuffixRowAdapterImpl: RowAdapterImpl {
+    let index: Int
+
+    func columnBaseIndexes(statement statement: SelectStatement) throws -> [(Int, String)] {
+        return Array(statement.columnNames.suffixFrom(index).enumerate())
     }
 }
 

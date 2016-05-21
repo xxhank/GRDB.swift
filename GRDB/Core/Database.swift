@@ -821,18 +821,7 @@ extension Database {
         // 1   | firstName | TEXT    | 0       | NULL       | 0  |
         // 2   | lastName  | TEXT    | 0       | NULL       | 0  |
         
-        if #available(iOS 8.2, OSX 10.10, *) { } else {
-            // Work around a bug in SQLite where PRAGMA table_info would
-            // return a result even after the table was deleted.
-            if !tableExists(tableName) {
-                throw DatabaseError(message: "no such table: \(tableName)")
-            }
-        }
-        let columnInfos = ColumnInfo.fetchAll(self, "PRAGMA table_info(\(tableName.quotedDatabaseIdentifier))")
-        guard columnInfos.count > 0 else {
-            throw DatabaseError(message: "no such table: \(tableName)")
-        }
-        
+        let columnInfos = try self.columnInfos(tableName)
         let primaryKey: PrimaryKey
         let pkColumnInfos = columnInfos
             .filter { $0.primaryKeyIndex > 0 }
@@ -878,6 +867,27 @@ extension Database {
         
         schemaCache.setPrimaryKey(primaryKey, forTableName: tableName)
         return primaryKey
+    }
+    
+    /// Returns the number of columns in a table
+    func numberOfColumns(tableName: String) throws -> Int {
+        return try columnInfos(tableName).count
+    }
+    
+    private func columnInfos(tableName: String) throws -> [ColumnInfo] {
+        if #available(iOS 8.2, OSX 10.10, *) { } else {
+            // Work around a bug in SQLite where PRAGMA table_info would
+            // return a result even after the table was deleted.
+            if !tableExists(tableName) {
+                throw DatabaseError(message: "no such table: \(tableName)")
+            }
+        }
+        let columnInfos = ColumnInfo.fetchAll(self, "PRAGMA table_info(\(tableName.quotedDatabaseIdentifier))")
+        guard columnInfos.count > 0 else {
+            throw DatabaseError(message: "no such table: \(tableName)")
+        }
+        
+        return columnInfos
     }
     
     // CREATE TABLE persons (
