@@ -20,7 +20,6 @@ class HasOneAssociationTests: GRDBTestCase {
             let parentTable = QueryInterfaceRequest<Void>(tableName: "parents")
             let association = HasOneAssociation(name: "child", childTable: "children", foreignKey: ["id": "parentID"])
             let request = parentTable.include(association)
-            print(sql(dbQueue, request))
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"parents\".*, \"children\".* FROM \"parents\" LEFT JOIN \"children\" ON \"children\".\"parentID\" = \"parents\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -87,8 +86,7 @@ class HasOneAssociationTests: GRDBTestCase {
             let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", childTable: "persons", foreignKey: ["id": "friendID"])
             let request = parentTable.include(association)
-            print(sql(dbQueue, request))
-            XCTAssertEqual(sql(dbQueue, request), "SELECT \"t0\".*, \"t1\".* FROM \"persons\" \"t0\" LEFT JOIN \"persons\" \"t1\" ON \"t1\".\"friendID\" = \"t0\".\"id\"")
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
                 Row.fetchAll(db, request)
@@ -128,7 +126,7 @@ class HasOneAssociationTests: GRDBTestCase {
                 
                 XCTAssertEqual(row.databaseValue(atIndex: 0), 2.databaseValue)
                 XCTAssertEqual(row.databaseValue(atIndex: 1), "Barbara".databaseValue)
-                XCTAssertEqual(row.databaseValue(atIndex: 2), DatabaseValue.Null)
+                XCTAssertEqual(row.databaseValue(atIndex: 2), 1.databaseValue)
                 XCTAssertEqual(row.databaseValue(atIndex: 3), DatabaseValue.Null)
                 XCTAssertEqual(row.databaseValue(atIndex: 4), DatabaseValue.Null)
                 XCTAssertEqual(row.databaseValue(atIndex: 5), DatabaseValue.Null)

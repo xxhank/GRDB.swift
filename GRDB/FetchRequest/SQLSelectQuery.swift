@@ -41,6 +41,25 @@ public struct _SQLSelectQuery {
     }
     
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
+        // Prevent source ambiguity
+        if let source = source {
+            var sourcesByName: [String: [_SQLSource]] = [:]
+            for source in source.referencedSources {
+                guard let name = source.name else { continue }
+                var sources = sourcesByName[name] ?? []
+                guard sources.indexOf({ $0 === source }) == nil else {
+                    continue
+                }
+                sources.append(source)
+                sourcesByName[name] = sources
+            }
+            for (name, sources) in sourcesByName where sources.count > 1 {
+                for (index, source) in sources.enumerate() {
+                    source.name = "\(name)\(index)"
+                }
+            }
+        }
+        
         var sql = "SELECT"
         
         if distinct {
@@ -231,6 +250,7 @@ public struct _SQLSelectQuery {
 /// TODO
 public protocol _SQLSource: class {
     var name: String? { get set }
+    var referencedSources: [_SQLSource] { get }
     func numberOfColumns(db: Database) throws -> Int
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
 }
@@ -249,13 +269,17 @@ class _SQLSourceTable : _SQLSource {
         set { alias = newValue }
     }
     
+    var referencedSources: [_SQLSource] {
+        return [self]
+    }
+    
     func numberOfColumns(db: Database) throws -> Int {
         return try db.numberOfColumns(tableName)
     }
     
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
         if let alias = alias {
-            return tableName.quotedDatabaseIdentifier + " AS " + alias.quotedDatabaseIdentifier
+            return tableName.quotedDatabaseIdentifier + " " + alias.quotedDatabaseIdentifier
         } else {
             return tableName.quotedDatabaseIdentifier
         }
@@ -269,6 +293,13 @@ class _SQLSourceQuery: _SQLSource {
     init(query: _SQLSelectQuery, name: String?) {
         self.query = query
         self.name = name
+    }
+    
+    var referencedSources: [_SQLSource] {
+        if let source = query.source {
+            return [self] + source.referencedSources
+        }
+        return [self]
     }
     
     func numberOfColumns(db: Database) throws -> Int {
@@ -296,6 +327,10 @@ class _SQLSourceJoinHasOne: _SQLSource {
     var name: String? {
         get { return baseSource.name }
         set { baseSource.name = newValue }
+    }
+    
+    var referencedSources: [_SQLSource] {
+        return [baseSource, association.joinedTable]
     }
     
     func numberOfColumns(db: Database) throws -> Int {
