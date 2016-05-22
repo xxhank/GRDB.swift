@@ -244,10 +244,23 @@ indirect enum _SQLSource {
             return tableName
         case .Query(let query, _):
             return query.tableName
-        case .JoinHasOne(let baseSource, let association):
+        case .JoinHasOne(let baseSource, _):
             return baseSource.tableName
 //        case .Join(let baseSource, _, _, _):
 //            return baseSource.tableName
+        }
+    }
+    
+    var sourceName: String? {
+        switch self {
+        case .Table(let tableName, let alias):
+            return alias ?? tableName
+        case .Query(let query, let alias):
+            return alias ?? query.source?.sourceName
+        case .JoinHasOne(let baseSource, _):
+            return baseSource.sourceName
+//        case .Join(let baseSource, _, _, _):
+//            return baseSource.sourceName
         }
     }
     
@@ -302,12 +315,15 @@ indirect enum _SQLSource {
             }
         case .JoinHasOne(let baseSource, let association):
             var sql = try baseSource.sql(db, &bindings)
-            sql += " JOIN \(association.childTable) AS \(association.name)"
+            sql += " LEFT JOIN \(association.childTable) AS \(association.name)"
             sql += " ON "
-            // TODO: foreign key
-            sql += try condition.sql(db, &bindings)
+            guard let baseSourceName = baseSource.sourceName else {
+                fatalError("Missing base source name")
+            }
+            sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
+                "\(association.name).\(foreignColumn) = \(baseSourceName).\(primaryColumn)"
+            }).joinWithSeparator(" AND ")
             return sql
-            break
 //        case .Join(let baseSource, let joinedTableName, let alias, let condition):
 //            var sql = try baseSource.sql(db, &bindings)
 //            sql += " JOIN \(joinedTableName)"

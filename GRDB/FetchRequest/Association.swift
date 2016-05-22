@@ -1,9 +1,9 @@
 public struct HasOneAssociation {
     let name: String
     let childTable: String
-    let foreignKey: Set<String>
+    let foreignKey: [String: String] // [primaryKeyColumn: foreignKeyColumn]
     
-    init(name: String, childTable: String, foreignKey: Set<String>) {
+    public init(name: String, childTable: String, foreignKey: [String: String]) {
         self.name = name
         self.childTable = childTable
         self.foreignKey = foreignKey
@@ -19,6 +19,14 @@ extension QueryInterfaceRequest {
         var query = self.query
         for association in associations {
             query.addSuffixSubrow(named: association.name)
+            if query.selection.count == 1 {
+                switch query.selection[0].sqlSelectableKind {
+                case .Star(nil):
+                    query.selection = [_SQLResultColumn.Star(query.source!.tableName!)]
+                default:
+                    break
+                }
+            }
             query.selection.append(_SQLResultColumn.Star(association.name))
             query.source = .JoinHasOne(baseSource: query.source!, association: association)
         }

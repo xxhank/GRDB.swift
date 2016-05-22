@@ -56,3 +56,4 @@ Reading list:
 - List of documentation keywords: https://swift.org/documentation/api-design-guidelines.html#special-instructions
 - https://www.zetetic.net/sqlcipher/
 - https://sqlite.org/sharedcache.html
+- https://www.sqlite.org/foreignkeys.html
