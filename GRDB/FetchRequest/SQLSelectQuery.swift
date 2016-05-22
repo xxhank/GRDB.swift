@@ -315,13 +315,13 @@ indirect enum _SQLSource {
             }
         case .JoinHasOne(let baseSource, let association):
             var sql = try baseSource.sql(db, &bindings)
-            sql += " LEFT JOIN \(association.childTable) AS \(association.name)"
+            sql += " LEFT JOIN \(association.childTable.quotedDatabaseIdentifier) \(association.name.quotedDatabaseIdentifier)"
             sql += " ON "
             guard let baseSourceName = baseSource.sourceName else {
                 fatalError("Missing base source name")
             }
             sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
-                "\(association.name).\(foreignColumn) = \(baseSourceName).\(primaryColumn)"
+                "\(association.name.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(baseSourceName.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
             }).joinWithSeparator(" AND ")
             return sql
 //        case .Join(let baseSource, let joinedTableName, let alias, let condition):

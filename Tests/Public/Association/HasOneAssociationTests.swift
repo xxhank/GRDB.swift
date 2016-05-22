@@ -15,9 +15,10 @@ class HasOneAssociationTests: GRDBTestCase {
                 try db.execute("CREATE TABLE children (id INTEGER PRIMARY KEY, parentID REFERENCES parents(id), name TEXT)")
             }
             let parentTable = QueryInterfaceRequest<Void>(tableName: "parents")
-            let association = HasOneAssociation(name: "children", childTable: "children", foreignKey: ["id": "parentID"])
+            let association = HasOneAssociation(name: "child", childTable: "children", foreignKey: ["id": "parentID"])
             let request = parentTable.include(association)
-            XCTAssertEqual(sql(dbQueue, request), "SELECT ...")
+            print(sql(dbQueue, request))
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"parents\".*, \"child\".* FROM \"parents\" LEFT JOIN \"children\" \"child\" ON \"child\".\"parentID\" = \"parents\".\"id\"")
         }
     }
 }
