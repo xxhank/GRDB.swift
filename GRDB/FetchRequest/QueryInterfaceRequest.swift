@@ -33,7 +33,8 @@ extension QueryInterfaceRequest : FetchRequest {
         return statement
     }
     
-    /// TODO
+    /// This method is part of the FetchRequest adoption; returns an eventual
+    /// row adapter.
     public func adapter(statement: SelectStatement) throws -> RowAdapter? {
         return try query.adapter(statement)
     }
