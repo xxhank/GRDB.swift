@@ -203,7 +203,7 @@ private struct SuffixRowAdapterImpl: RowAdapterImpl {
     let index: Int
 
     func columnBaseIndexes(statement statement: SelectStatement) throws -> [(Int, String)] {
-        return Array(statement.columnNames.suffixFrom(index).enumerate())
+        return statement.columnNames.suffixFrom(index).enumerate().map { return ($0 + index, $1) }
     }
 }
 
@@ -247,7 +247,7 @@ struct ColumnsAdapter {
 
     init(columnBaseIndexes: [(Int, String)]) {
         self.columnBaseIndexes = columnBaseIndexes
-        self.lowercaseColumnIndexes = Dictionary(keyValueSequence: columnBaseIndexes.enumerate().map { ($1.1.lowercaseString, $0) })
+        self.lowercaseColumnIndexes = Dictionary(keyValueSequence: columnBaseIndexes.enumerate().map { ($1.1.lowercaseString, $0) }.reverse())
     }
 
     var count: Int {
