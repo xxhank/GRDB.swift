@@ -75,4 +75,75 @@ class HasOneAssociationTests: GRDBTestCase {
             }
         }
     }
+    
+    func testRecursiveAssociation() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                try db.execute("CREATE TABLE persons (id INTEGER PRIMARY KEY, name TEXT, friendID INTEGER REFERENCES persons(id))")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (1, 'Arthur', NULL)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
+            }
+            let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let association = HasOneAssociation(name: "friend", childTable: "persons", foreignKey: ["id": "friendID"])
+            let request = parentTable.include(association)
+            print(sql(dbQueue, request))
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"t0\".*, \"t1\".* FROM \"persons\" \"t0\" LEFT JOIN \"persons\" \"t1\" ON \"t1\".\"friendID\" = \"t0\".\"id\"")
+            
+            let rows = dbQueue.inDatabase { db in
+                Row.fetchAll(db, request)
+            }
+            XCTAssertEqual(rows.count, 2)
+            
+            do {
+                let row = rows[0]
+                XCTAssertEqual(Array(row.columnNames), ["id", "name", "friendID", "id", "name", "friendID"])
+                
+                XCTAssertEqual(row.databaseValue(atIndex: 0), 1.databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 1), "Arthur".databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 2), DatabaseValue.Null)
+                XCTAssertEqual(row.databaseValue(atIndex: 3), 2.databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 4), "Barbara".databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 5), 1.databaseValue)
+                
+                XCTAssertEqual(row.value(named: "id") as Int, 1)
+                XCTAssertEqual(row.value(named: "name") as String, "Arthur")
+                XCTAssertTrue(row.value(named: "friendID") == nil)
+                
+                let subrow = row.subrow(named: association.name)!
+                XCTAssertEqual(Array(subrow.columnNames), ["id", "name", "friendID"])
+                
+                XCTAssertEqual(subrow.databaseValue(atIndex: 0), 2.databaseValue)
+                XCTAssertEqual(subrow.databaseValue(atIndex: 1), "Barbara".databaseValue)
+                XCTAssertEqual(subrow.databaseValue(atIndex: 2), 1.databaseValue)
+                
+                XCTAssertEqual(subrow.value(named: "id") as Int, 2)
+                XCTAssertEqual(subrow.value(named: "name") as String, "Barbara")
+                XCTAssertEqual(subrow.value(named: "friendID") as Int, 1)
+            }
+            
+            do {
+                let row = rows[1]
+                XCTAssertEqual(Array(row.columnNames), ["id", "name", "friendID", "id", "name", "friendID"])
+                
+                XCTAssertEqual(row.databaseValue(atIndex: 0), 2.databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 1), "Barbara".databaseValue)
+                XCTAssertEqual(row.databaseValue(atIndex: 2), DatabaseValue.Null)
+                XCTAssertEqual(row.databaseValue(atIndex: 3), DatabaseValue.Null)
+                XCTAssertEqual(row.databaseValue(atIndex: 4), DatabaseValue.Null)
+                XCTAssertEqual(row.databaseValue(atIndex: 5), DatabaseValue.Null)
+                
+                XCTAssertEqual(row.value(named: "id") as Int, 2)
+                XCTAssertEqual(row.value(named: "name") as String, "Barbara")
+                XCTAssertEqual(row.value(named: "friendID") as Int, 1)
+                
+                let subrow = row.subrow(named: association.name)!
+                XCTAssertEqual(Array(subrow.columnNames), ["id", "name", "friendID"])
+                
+                XCTAssertEqual(subrow.databaseValue(atIndex: 0), DatabaseValue.Null)
+                XCTAssertEqual(subrow.databaseValue(atIndex: 1), DatabaseValue.Null)
+                XCTAssertEqual(subrow.databaseValue(atIndex: 2), DatabaseValue.Null)
+            }
+        }
+    }
 }
