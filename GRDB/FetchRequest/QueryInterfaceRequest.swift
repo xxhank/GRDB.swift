@@ -8,7 +8,8 @@ public struct QueryInterfaceRequest<T> {
     ///
     /// It represents the SQL query `SELECT * FROM tableName`.
     public init(tableName: String) {
-        self.init(query: _SQLSelectQuery(select: [_SQLResultColumn.Star(nil)], from: .Table(name: tableName, alias: nil)))
+        let source = _SQLSourceTable(tableName: tableName, alias: nil)
+        self.init(query: _SQLSelectQuery(select: [_SQLResultColumn.Star(source)], from: source))
     }
     
     init(query: _SQLSelectQuery) {
@@ -33,8 +34,8 @@ extension QueryInterfaceRequest : FetchRequest {
     }
     
     /// TODO
-    public var adapter: RowAdapter? {
-        return nil
+    public func adapter(statement: SelectStatement) throws -> RowAdapter? {
+        return try query.adapter(statement)
     }
 }
 

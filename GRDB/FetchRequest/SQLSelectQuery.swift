@@ -48,7 +48,11 @@ public struct _SQLSelectQuery {
         }
         
         assert(!selection.isEmpty)
-        sql += try " " + selection.map { try $0.resultColumnSQL(db, &bindings) }.joinWithSeparator(", ")
+        if case .Star(let starSource) = selection[0].sqlSelectableKind where starSource === source {
+            sql += " *"
+        } else {
+            sql += try " " + selection.map { try $0.resultColumnSQL(db, &bindings) }.joinWithSeparator(", ")
+        }
         
         if let source = source {
             sql += try " FROM " + source.sql(db, &bindings)
@@ -105,7 +109,7 @@ public struct _SQLSelectQuery {
             return trivialCountQuery
         }
         
-        guard let source = source, case .Table(name: let tableName, alias: let alias) = source else {
+        guard let table = source as? _SQLSourceTable else {
             // SELECT ... FROM (something which is not a table)
             return trivialCountQuery
         }
@@ -114,15 +118,13 @@ public struct _SQLSelectQuery {
         if selection.count == 1 {
             let selectable = self.selection[0]
             switch selectable.sqlSelectableKind {
-            case .Star(sourceName: let sourceName):
+            case .Star(source: let source):
                 guard !distinct else {
                     return trivialCountQuery
                 }
                 
-                if let sourceName = sourceName {
-                    guard sourceName == tableName || sourceName == alias else {
-                        return trivialCountQuery
-                    }
+                guard source === table else {
+                    return trivialCountQuery
                 }
                 
                 // SELECT * FROM tableName ...
@@ -147,7 +149,7 @@ public struct _SQLSelectQuery {
                     // ->
                     // SELECT COUNT(*) FROM tableName ...
                     var countQuery = unorderedQuery
-                    countQuery.selection = [_SQLExpression.Count(_SQLResultColumn.Star(nil))]
+                    countQuery.selection = [_SQLExpression.Count(_SQLResultColumn.Star(table))]
                     return countQuery
                 }
             }
@@ -162,16 +164,17 @@ public struct _SQLSelectQuery {
             // ->
             // SELECT COUNT(*) FROM tableName ...
             var countQuery = unorderedQuery
-            countQuery.selection = [_SQLExpression.Count(_SQLResultColumn.Star(nil))]
+            countQuery.selection = [_SQLExpression.Count(_SQLResultColumn.Star(table))]
             return countQuery
         }
     }
     
     // SELECT COUNT(*) FROM (self)
     private var trivialCountQuery: _SQLSelectQuery {
+        let source = _SQLSourceQuery(query: unorderedQuery, name: nil)
         return _SQLSelectQuery(
-            select: [_SQLExpression.Count(_SQLResultColumn.Star(nil))],
-            from: .Query(query: unorderedQuery, alias: nil))
+            select: [_SQLExpression.Count(_SQLResultColumn.Star(source))],
+            from: source)
     }
     
     /// Remove ordering
@@ -180,10 +183,6 @@ public struct _SQLSelectQuery {
         query.reversed = false
         query.sortDescriptors = []
         return query
-    }
-    
-    private var tableName: String? {
-        return source?.tableName
     }
     
     mutating func addSuffixSubrow(named name: String) {
@@ -202,11 +201,8 @@ public struct _SQLSelectQuery {
             switch selectable.sqlSelectableKind {
             case .Expression:
                 columnIndex += 1
-            case .Star(let sourceName):
-                guard let tableName = tableNameForSource(named: sourceName) else {
-                    fatalError("No table for name \(sourceName)")
-                }
-                columnIndex += try statement.database.numberOfColumns(tableName)
+            case .Star(let source):
+                columnIndex += try source.numberOfColumns(statement.database)
             }
         }
         
@@ -217,14 +213,14 @@ public struct _SQLSelectQuery {
         return RowAdapter(subrows: Dictionary(keyValueSequence: subrowAdapters))
     }
     
-    func tableNameForSource(named sourceName: String?) -> String? {
-        if let sourceName = sourceName {
-            guard let source = source else {
-                fatalError("Missing query source")
+    func numberOfColumns(db: Database) throws -> Int {
+        return try selection.reduce(0) { (count, let selectable) in
+            switch selectable.sqlSelectableKind {
+            case .Expression:
+                return count + 1
+            case .Star(let source):
+                return try count + source.numberOfColumns(db)
             }
-            return source.tableNameForSource(named: sourceName)
-        } else {
-            return source?.tableName
         }
     }
 }
@@ -232,108 +228,89 @@ public struct _SQLSelectQuery {
 
 // MARK: - _SQLSource
 
-indirect enum _SQLSource {
-    case Table(name: String, alias: String?)
-    case Query(query: _SQLSelectQuery, alias: String?)
-    case JoinHasOne(baseSource: _SQLSource, association: HasOneAssociation)
-//    case Join(baseSource: _SQLSource, joinedTableName: String, alias: String?, condition: _SQLExpression)
+/// TODO
+public protocol _SQLSource: class {
+    var name: String? { get set }
+    func numberOfColumns(db: Database) throws -> Int
+    func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
+}
+
+class _SQLSourceTable : _SQLSource {
+    private let tableName: String
+    var alias: String?
     
-    var tableName: String? {
-        switch self {
-        case .Table(let tableName, _):
-            return tableName
-        case .Query(let query, _):
-            return query.tableName
-        case .JoinHasOne(let baseSource, _):
-            return baseSource.tableName
-//        case .Join(let baseSource, _, _, _):
-//            return baseSource.tableName
-        }
+    init(tableName: String, alias: String?) {
+        self.tableName = tableName
+        self.alias = alias
     }
     
-    var sourceName: String? {
-        switch self {
-        case .Table(let tableName, let alias):
-            return alias ?? tableName
-        case .Query(let query, let alias):
-            return alias ?? query.source?.sourceName
-        case .JoinHasOne(let baseSource, _):
-            return baseSource.sourceName
-//        case .Join(let baseSource, _, _, _):
-//            return baseSource.sourceName
-        }
+    var name : String? {
+        get { return alias ?? tableName }
+        set { alias = newValue }
     }
     
-    func tableNameForSource(named sourceName: String?) -> String? {
-        switch self {
-        case .Table(let tableName, let alias):
-            if let alias = alias {
-                if alias == sourceName {
-                    return tableName
-                }
-            } else if sourceName == tableName {
-                return tableName
-            }
-            return nil
-        case .Query(let query, let alias):
-            if alias == sourceName {
-                return query.tableName
-            }
-            return nil
-        case .JoinHasOne(let baseSource, let association):
-            if sourceName == association.name {
-                return association.childTable
-            }
-            if sourceName == association.childTable {
-                return association.childTable
-            }
-            return baseSource.tableNameForSource(named: sourceName)
-//        case .Join(let baseSource, let joinedTableName, let alias, condition: _):
-//            if alias == sourceName {
-//                return joinedTableName
-//            }
-//            if joinedTableName == sourceName {
-//                return joinedTableName
-//            }
-//            return baseSource.tableNameForSource(named: sourceName)
-        }
+    func numberOfColumns(db: Database) throws -> Int {
+        return try db.numberOfColumns(tableName)
     }
     
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
-        switch self {
-        case .Table(let table, let alias):
-            if let alias = alias {
-                return table.quotedDatabaseIdentifier + " AS " + alias.quotedDatabaseIdentifier
-            } else {
-                return table.quotedDatabaseIdentifier
-            }
-        case .Query(let query, let alias):
-            if let alias = alias {
-                return try "(" + query.sql(db, &bindings) + ") AS " + alias.quotedDatabaseIdentifier
-            } else {
-                return try "(" + query.sql(db, &bindings) + ")"
-            }
-        case .JoinHasOne(let baseSource, let association):
-            var sql = try baseSource.sql(db, &bindings)
-            sql += " LEFT JOIN \(association.childTable.quotedDatabaseIdentifier) \(association.name.quotedDatabaseIdentifier)"
-            sql += " ON "
-            guard let baseSourceName = baseSource.sourceName else {
-                fatalError("Missing base source name")
-            }
-            sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
-                "\(association.name.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(baseSourceName.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
-            }).joinWithSeparator(" AND ")
-            return sql
-//        case .Join(let baseSource, let joinedTableName, let alias, let condition):
-//            var sql = try baseSource.sql(db, &bindings)
-//            sql += " JOIN \(joinedTableName)"
-//            if let alias = alias {
-//                sql += " \(alias)"
-//            }
-//            sql += " ON "
-//            sql += try condition.sql(db, &bindings)
-//            return sql
+        if let alias = alias {
+            return tableName.quotedDatabaseIdentifier + " AS " + alias.quotedDatabaseIdentifier
+        } else {
+            return tableName.quotedDatabaseIdentifier
         }
+    }
+}
+
+class _SQLSourceQuery: _SQLSource {
+    private let query: _SQLSelectQuery
+    var name: String?
+    
+    init(query: _SQLSelectQuery, name: String?) {
+        self.query = query
+        self.name = name
+    }
+    
+    func numberOfColumns(db: Database) throws -> Int {
+        return try query.numberOfColumns(db)
+    }
+
+    func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
+        if let name = name {
+            return try "(" + query.sql(db, &bindings) + ") AS " + name.quotedDatabaseIdentifier
+        } else {
+            return try "(" + query.sql(db, &bindings) + ")"
+        }
+    }
+}
+
+class _SQLSourceJoinHasOne: _SQLSource {
+    private let baseSource: _SQLSource
+    private let association: HasOneAssociation
+    
+    init(baseSource: _SQLSource, association: HasOneAssociation) {
+        self.baseSource = baseSource
+        self.association = association
+    }
+    
+    var name: String? {
+        get { return baseSource.name }
+        set { baseSource.name = newValue }
+    }
+    
+    func numberOfColumns(db: Database) throws -> Int {
+        return try baseSource.numberOfColumns(db) + association.joinedTable.numberOfColumns(db)
+    }
+    
+    func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
+        var sql = try baseSource.sql(db, &bindings)
+        let joinedTableSQL = try association.joinedTable.sql(db, &bindings)
+        sql += " LEFT JOIN " + joinedTableSQL
+        sql += " ON "
+        sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
+            "\(association.joinedTable.name!.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(baseSource.name!.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
+        }).joinWithSeparator(" AND ")
+        return sql
     }
 }
 
@@ -740,12 +717,12 @@ public protocol _SQLSelectable {
 ///
 /// See https://github.com/groue/GRDB.swift/#the-query-interface
 public enum _SQLSelectableKind {
+    case Star(_SQLSource)
     case Expression(_SQLExpression)
-    case Star(sourceName: String?)
 }
 
 enum _SQLResultColumn {
-    case Star(String?)
+    case Star(_SQLSource)
     case Expression(expression: _SQLExpression, alias: String)
 }
 
@@ -753,8 +730,8 @@ extension _SQLResultColumn : _SQLSelectable {
     
     func resultColumnSQL(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
         switch self {
-        case .Star(let sourceName):
-            if let sourceName = sourceName {
+        case .Star(let source):
+            if let sourceName = source.name {
                 return sourceName.quotedDatabaseIdentifier + ".*"
             } else {
                 return "*"
@@ -775,8 +752,8 @@ extension _SQLResultColumn : _SQLSelectable {
     
     var sqlSelectableKind: _SQLSelectableKind {
         switch self {
-        case .Star(let sourceName):
-            return .Star(sourceName: sourceName)
+        case .Star(let source):
+            return .Star(source)
         case .Expression(expression: let expression, alias: _):
             return .Expression(expression)
         }
