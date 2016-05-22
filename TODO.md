@@ -1,3 +1,4 @@
+– [ ] Associations: include two chained associations
 - [ ] Record should not adopt CustomStringConvertible: https://github.com/groue/GRDB.swift/issues/58
 - [ ] maximumReaderCount in Configuration: update README
 - [ ] FetchedRecordsController: document that identity comparison is only required for table view events.
