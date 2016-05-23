@@ -1,8 +1,8 @@
 import XCTest
 #if SQLITE_HAS_CODEC
-    @testable import GRDBCipher // @testable so that we have access to SQLiteConnectionWillClose
+    import GRDBCipher
 #else
-    @testable import GRDB       // @testable so that we have access to SQLiteConnectionWillClose
+    import GRDB
 #endif
 
 class HasOneAssociationTests: GRDBTestCase {
@@ -19,7 +19,7 @@ class HasOneAssociationTests: GRDBTestCase {
             }
             let parentTable = QueryInterfaceRequest<Void>(tableName: "parents")
             let association = HasOneAssociation(name: "child", childTable: "children", foreignKey: ["id": "parentID"])
-            let request = parentTable.include(association)
+            let request = parentTable.join(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"parents\".*, \"children\".* FROM \"parents\" LEFT JOIN \"children\" ON \"children\".\"parentID\" = \"parents\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -85,7 +85,7 @@ class HasOneAssociationTests: GRDBTestCase {
             }
             let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", childTable: "persons", foreignKey: ["id": "friendID"])
-            let request = parentTable.include(association)
+            let request = parentTable.join(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -142,6 +142,27 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(subrow.databaseValue(atIndex: 1), DatabaseValue.Null)
                 XCTAssertEqual(subrow.databaseValue(atIndex: 2), DatabaseValue.Null)
             }
+        }
+    }
+    
+    func testTwoLevelsRecursiveAssociation() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                try db.execute("CREATE TABLE persons (id INTEGER PRIMARY KEY, name TEXT, friendID INTEGER REFERENCES persons(id))")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (1, 'Arthur', NULL)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (3, 'Craig', 2)")
+            }
+            let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let association = HasOneAssociation(name: "friend", childTable: "persons", foreignKey: ["id": "friendID"])
+            let request = parentTable.join(association.join(association))
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".*, \"persons2\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\" LEFT JOIN \"persons\" \"persons2\" ON \"persons2\".\"friendID\" = \"persons1\".\"id\"")
+            
+            let rows = dbQueue.inDatabase { db in
+                Row.fetchAll(db, request)
+            }
+            XCTAssertEqual(rows.count, 3)
         }
     }
 }

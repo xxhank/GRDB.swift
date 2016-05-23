@@ -1298,13 +1298,13 @@
 		56300B6D1C53F592005A543B /* FetchRequest */ = {
 			isa = PBXGroup;
 			children = (
+				569C1ECE1CF0A57E0042627B /* Association.swift */,
 				5687358B1CEDC334009B9116 /* FetchRequest.swift */,
 				56300B6F1C53F592005A543B /* QueryInterfaceRequest.swift */,
 				5605F1891C6B1A8700235C62 /* SQLCollation.swift */,
 				5605F18A1C6B1A8700235C62 /* SQLFunction.swift */,
 				5605F18B1C6B1A8700235C62 /* SQLOperator.swift */,
 				5605F18C1C6B1A8700235C62 /* SQLSelectQuery.swift */,
-				569C1ECE1CF0A57E0042627B /* Association.swift */,
 			);
 			path = FetchRequest;
 			sourceTree = "<group>";

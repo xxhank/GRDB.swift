@@ -253,9 +253,10 @@ public protocol _SQLSource: class {
     var referencedSources: [_SQLSource] { get }
     func numberOfColumns(db: Database) throws -> Int
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
+    func copy() -> Self
 }
 
-class _SQLSourceTable : _SQLSource {
+final class _SQLSourceTable : _SQLSource {
     private let tableName: String
     var alias: String?
     
@@ -284,9 +285,13 @@ class _SQLSourceTable : _SQLSource {
             return tableName.quotedDatabaseIdentifier
         }
     }
+    
+    func copy() -> _SQLSourceTable {
+        return _SQLSourceTable(tableName: tableName, alias: alias)
+    }
 }
 
-class _SQLSourceQuery: _SQLSource {
+final class _SQLSourceQuery: _SQLSource {
     private let query: _SQLSelectQuery
     var name: String?
     
@@ -313,14 +318,20 @@ class _SQLSourceQuery: _SQLSource {
             return try "(" + query.sql(db, &bindings) + ")"
         }
     }
+    
+    func copy() -> _SQLSourceQuery {
+        return _SQLSourceQuery(query: query, name: name)
+    }
 }
 
-class _SQLSourceJoinHasOne: _SQLSource {
+final class _SQLSourceJoinHasOne: _SQLSource {
     private let baseSource: _SQLSource
+    private let joinSource: _SQLSource
     private let association: HasOneAssociation
     
-    init(baseSource: _SQLSource, association: HasOneAssociation) {
+    init(baseSource: _SQLSource, joinSource: _SQLSource, association: HasOneAssociation) {
         self.baseSource = baseSource
+        self.joinSource = joinSource
         self.association = association
     }
     
@@ -330,7 +341,7 @@ class _SQLSourceJoinHasOne: _SQLSource {
     }
     
     var referencedSources: [_SQLSource] {
-        return [baseSource, association.joinedTable]
+        return [baseSource, joinSource, association.joinedTable]
     }
     
     func numberOfColumns(db: Database) throws -> Int {
@@ -343,9 +354,13 @@ class _SQLSourceJoinHasOne: _SQLSource {
         sql += " LEFT JOIN " + joinedTableSQL
         sql += " ON "
         sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
-            "\(association.joinedTable.name!.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(baseSource.name!.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
+            "\(association.joinedTable.name!.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(joinSource.name!.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
         }).joinWithSeparator(" AND ")
         return sql
+    }
+    
+    func copy() -> _SQLSourceJoinHasOne {
+        return _SQLSourceJoinHasOne(baseSource: baseSource, joinSource: joinSource, association: association)
     }
 }
 
