@@ -145,7 +145,7 @@ class HasOneAssociationTests: GRDBTestCase {
         }
     }
     
-    func testTwoLevelsRecursiveAssociation() {
+    func testNestedRecursiveAssociation() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
