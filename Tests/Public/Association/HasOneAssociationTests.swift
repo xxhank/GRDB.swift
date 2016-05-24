@@ -17,9 +17,9 @@ class HasOneAssociationTests: GRDBTestCase {
                 try db.execute("INSERT INTO owner (id, name) VALUES (2, 'owner2')")
                 try db.execute("INSERT INTO owned (id, ownerID, name) VALUES (100, 1, 'owned1')")
             }
-            let parentTable = QueryInterfaceRequest<Void>(tableName: "owner")
-            let association = HasOneAssociation(name: "child", tableName: "owned", foreignKey: ["id": "ownerID"])
-            let request = parentTable.join(association)
+            let rootTable = QueryInterfaceRequest<Void>(tableName: "owner")
+            let association = HasOneAssociation(name: "owned", tableName: "owned", foreignKey: ["id": "ownerID"])
+            let request = rootTable.join(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"owner\".*, \"owned\".* FROM \"owner\" LEFT JOIN \"owned\" ON \"owned\".\"ownerID\" = \"owner\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -61,9 +61,9 @@ class HasOneAssociationTests: GRDBTestCase {
                 try db.execute("INSERT INTO persons (id, name, friendID) VALUES (1, 'Arthur', NULL)")
                 try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
             }
-            let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
-            let request = parentTable.join(association)
+            let request = rootTable.join(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -106,9 +106,9 @@ class HasOneAssociationTests: GRDBTestCase {
                 try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
                 try db.execute("INSERT INTO persons (id, name, friendID) VALUES (3, 'Craig', 2)")
             }
-            let parentTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
-            let request = parentTable.join(association.join(association))
+            let request = rootTable.join(association.join(association))
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".*, \"persons2\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\" LEFT JOIN \"persons\" \"persons2\" ON \"persons2\".\"friendID\" = \"persons1\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
