@@ -63,7 +63,7 @@ extension HasOneAssociation : Association {
     /// TODO
     public func joinedQuery(query: _SQLSelectQuery, _ source: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
         var query = query
-        query.addSuffixSubrow(named: name)
+        query.addSuffixRowVariant(named: name)
         query.selection.append(_SQLResultColumn.Star(joinedTable))
         query.source = _SQLSourceJoinHasOne(baseSource: query.source!, joinSource: source, association: self)
         return (query, joinedTable)

@@ -145,10 +145,10 @@ public struct RowAdapter {
         impl = SuffixRowAdapterImpl(index: index)
     }
     
-    init(subrows subRowAdapters: [String: RowAdapter]) {
+    init(variantRowAdapters: [String: RowAdapter]) {
         impl = NestedRowAdapterImpl(
             mainRowAdapter: RowAdapter(impl: IdentityRowAdapterImpl()),
-            subRowAdapters: subRowAdapters)
+            variantRowAdapters: variantRowAdapters)
     }
     
     private init(impl: RowAdapterImpl) {

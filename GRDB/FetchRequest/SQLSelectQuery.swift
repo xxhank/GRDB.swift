@@ -16,7 +16,7 @@ public struct _SQLSelectQuery {
     var reversed: Bool
     var havingExpression: _SQLExpression?
     var limit: _SQLLimit?
-    var indexedSubrows: [(name: String, index: Int)] = []
+    var rowVariantIndexes: [(name: String, index: Int)] = []
     
     init(
         select selection: [_SQLSelectable],
@@ -204,12 +204,12 @@ public struct _SQLSelectQuery {
         return query
     }
     
-    mutating func addSuffixSubrow(named name: String) {
-        indexedSubrows.append((name: name, index: selection.count))
+    mutating func addSuffixRowVariant(named name: String) {
+        rowVariantIndexes.append((name: name, index: selection.count))
     }
     
     func adapter(statement: SelectStatement) throws -> RowAdapter? {
-        guard !indexedSubrows.isEmpty else {
+        guard !rowVariantIndexes.isEmpty else {
             return nil
         }
         
@@ -225,11 +225,11 @@ public struct _SQLSelectQuery {
             }
         }
         
-        let subrowAdapters = indexedSubrows.map { (subrowName, selectionIndex) -> (String, RowAdapter) in
+        let variantRowAdapters = rowVariantIndexes.map { (variantName, selectionIndex) -> (String, RowAdapter) in
             let columnIndex = columnIndexForSelectionIndex[selectionIndex]!
-            return (subrowName, RowAdapter(fromColumnAtIndex: columnIndex))
+            return (variantName, RowAdapter(fromColumnAtIndex: columnIndex))
         }
-        return RowAdapter(subrows: Dictionary(keyValueSequence: subrowAdapters))
+        return RowAdapter(variantRowAdapters: Dictionary(keyValueSequence: variantRowAdapters))
     }
     
     func numberOfColumns(db: Database) throws -> Int {

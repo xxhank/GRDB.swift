@@ -40,16 +40,16 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(row.value(named: "id") as Int, 1)
                 XCTAssertEqual(row.value(named: "name") as String, "parent1")
                 
-                let subrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subrow.columnNames), ["id", "parentID", "name"])
+                let variant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(variant.columnNames), ["id", "parentID", "name"])
                 
-                XCTAssertEqual(subrow.databaseValue(atIndex: 0), 100.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 1), 1.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 2), "child1".databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 0), 100.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 1), 1.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 2), "child1".databaseValue)
                 
-                XCTAssertEqual(subrow.value(named: "id") as Int, 100)
-                XCTAssertEqual(subrow.value(named: "parentID") as Int, 1)
-                XCTAssertEqual(subrow.value(named: "name") as String, "child1")
+                XCTAssertEqual(variant.value(named: "id") as Int, 100)
+                XCTAssertEqual(variant.value(named: "parentID") as Int, 1)
+                XCTAssertEqual(variant.value(named: "name") as String, "child1")
             }
             
             do {
@@ -65,12 +65,12 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(row.value(named: "id") as Int, 2)
                 XCTAssertEqual(row.value(named: "name") as String, "parent2")
                 
-                let subrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subrow.columnNames), ["id", "parentID", "name"])
+                let variant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(variant.columnNames), ["id", "parentID", "name"])
                 
-                XCTAssertEqual(subrow.databaseValue(atIndex: 0), DatabaseValue.Null)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 1), DatabaseValue.Null)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 2), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 0), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 1), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 2), DatabaseValue.Null)
             }
         }
     }
@@ -108,16 +108,16 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(row.value(named: "name") as String, "Arthur")
                 XCTAssertTrue(row.value(named: "friendID") == nil)
                 
-                let subrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subrow.columnNames), ["id", "name", "friendID"])
+                let variant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(variant.columnNames), ["id", "name", "friendID"])
                 
-                XCTAssertEqual(subrow.databaseValue(atIndex: 0), 2.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 1), "Barbara".databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 2), 1.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 0), 2.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 1), "Barbara".databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 2), 1.databaseValue)
                 
-                XCTAssertEqual(subrow.value(named: "id") as Int, 2)
-                XCTAssertEqual(subrow.value(named: "name") as String, "Barbara")
-                XCTAssertEqual(subrow.value(named: "friendID") as Int, 1)
+                XCTAssertEqual(variant.value(named: "id") as Int, 2)
+                XCTAssertEqual(variant.value(named: "name") as String, "Barbara")
+                XCTAssertEqual(variant.value(named: "friendID") as Int, 1)
             }
             
             do {
@@ -135,12 +135,12 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(row.value(named: "name") as String, "Barbara")
                 XCTAssertEqual(row.value(named: "friendID") as Int, 1)
                 
-                let subrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subrow.columnNames), ["id", "name", "friendID"])
+                let variant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(variant.columnNames), ["id", "name", "friendID"])
                 
-                XCTAssertEqual(subrow.databaseValue(atIndex: 0), DatabaseValue.Null)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 1), DatabaseValue.Null)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 2), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 0), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 1), DatabaseValue.Null)
+                XCTAssertEqual(variant.databaseValue(atIndex: 2), DatabaseValue.Null)
             }
         }
     }
@@ -182,30 +182,30 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(row.value(named: "name") as String, "Arthur")
                 XCTAssertTrue(row.value(named: "friendID") == nil)
                 
-                let subrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subrow.columnNames), ["id", "name", "friendID", "id", "name", "friendID"])
+                let variant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(variant.columnNames), ["id", "name", "friendID", "id", "name", "friendID"])
                 
-                XCTAssertEqual(subrow.databaseValue(atIndex: 0), 2.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 1), "Barbara".databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 2), 1.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 3), 3.databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 4), "Craig".databaseValue)
-                XCTAssertEqual(subrow.databaseValue(atIndex: 5), 2.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 0), 2.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 1), "Barbara".databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 2), 1.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 3), 3.databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 4), "Craig".databaseValue)
+                XCTAssertEqual(variant.databaseValue(atIndex: 5), 2.databaseValue)
                 
-                XCTAssertEqual(subrow.value(named: "id") as Int, 2)
-                XCTAssertEqual(subrow.value(named: "name") as String, "Barbara")
-                XCTAssertEqual(subrow.value(named: "friendID") as Int, 1)
+                XCTAssertEqual(variant.value(named: "id") as Int, 2)
+                XCTAssertEqual(variant.value(named: "name") as String, "Barbara")
+                XCTAssertEqual(variant.value(named: "friendID") as Int, 1)
                 
-                let subsubrow = row.subrow(named: association.name)!
-                XCTAssertEqual(Array(subsubrow.columnNames), ["id", "name", "friendID"])
+                let subvariant = row.variant(named: association.name)!
+                XCTAssertEqual(Array(subvariant.columnNames), ["id", "name", "friendID"])
                 
-                XCTAssertEqual(subsubrow.databaseValue(atIndex: 0), 3.databaseValue)
-                XCTAssertEqual(subsubrow.databaseValue(atIndex: 1), "Craig".databaseValue)
-                XCTAssertEqual(subsubrow.databaseValue(atIndex: 2), 2.databaseValue)
+                XCTAssertEqual(subvariant.databaseValue(atIndex: 0), 3.databaseValue)
+                XCTAssertEqual(subvariant.databaseValue(atIndex: 1), "Craig".databaseValue)
+                XCTAssertEqual(subvariant.databaseValue(atIndex: 2), 2.databaseValue)
                 
-                XCTAssertEqual(subsubrow.value(named: "id") as Int, 3)
-                XCTAssertEqual(subsubrow.value(named: "name") as String, "Craig")
-                XCTAssertEqual(subsubrow.value(named: "friendID") as Int, 2)
+                XCTAssertEqual(subvariant.value(named: "id") as Int, 3)
+                XCTAssertEqual(subvariant.value(named: "name") as String, "Craig")
+                XCTAssertEqual(subvariant.value(named: "friendID") as Int, 2)
             }
         }
     }
