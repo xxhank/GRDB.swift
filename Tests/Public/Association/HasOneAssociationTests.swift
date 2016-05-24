@@ -196,7 +196,7 @@ class HasOneAssociationTests: GRDBTestCase {
                 XCTAssertEqual(variant.value(named: "name") as String, "Barbara")
                 XCTAssertEqual(variant.value(named: "friendID") as Int, 1)
                 
-                let subvariant = row.variant(named: association.name)!
+                let subvariant = variant.variant(named: association.name)!
                 XCTAssertEqual(Array(subvariant.columnNames), ["id", "name", "friendID"])
                 
                 XCTAssertEqual(subvariant.databaseValue(atIndex: 0), 3.databaseValue)

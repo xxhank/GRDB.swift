@@ -16,7 +16,6 @@ public struct _SQLSelectQuery {
     var reversed: Bool
     var havingExpression: _SQLExpression?
     var limit: _SQLLimit?
-    var rowVariantIndexes: [(name: String, index: Int)] = []
     
     init(
         select selection: [_SQLSelectable],
@@ -204,15 +203,20 @@ public struct _SQLSelectQuery {
         return query
     }
     
-    mutating func addSuffixRowVariant(named name: String) {
-        rowVariantIndexes.append((name: name, index: selection.count))
-    }
-    
     func adapter(statement: SelectStatement) throws -> RowAdapter? {
-        guard !rowVariantIndexes.isEmpty else {
+        guard let source = source else {
             return nil
         }
-        
+        // Our sources define variant based on selection index:
+        //
+        //      SELECT a.*, b.* FROM a JOIN b ...
+        //                  ^ variant at selection index 1
+        //
+        // Now that we have a statement, we can turn those indexes into
+        // column indexes:
+        //
+        //      SELECT a.id, a.name, b.id, b.title FROM a JOIN b ...
+        //                           ^ variant at column index 2
         var columnIndex = 0
         var columnIndexForSelectionIndex: [Int: Int] = [:]
         for (selectionIndex, selectable) in selection.enumerate() {
@@ -225,11 +229,7 @@ public struct _SQLSelectQuery {
             }
         }
         
-        let variantRowAdapters = rowVariantIndexes.map { (variantName, selectionIndex) -> (String, RowAdapter) in
-            let columnIndex = columnIndexForSelectionIndex[selectionIndex]!
-            return (variantName, RowAdapter(fromColumnAtIndex: columnIndex))
-        }
-        return RowAdapter(variantRowAdapters: Dictionary(keyValueSequence: variantRowAdapters))
+        return source.adapter(columnIndexForSelectionIndex, variantRowAdapters: [:])
     }
     
     func numberOfColumns(db: Database) throws -> Int {
@@ -253,7 +253,20 @@ public protocol _SQLSource: class {
     var referencedSources: [_SQLSource] { get }
     func numberOfColumns(db: Database) throws -> Int
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
+    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter?
     func copy() -> Self
+}
+
+extension _SQLSource {
+    // Default implementation
+    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter? {
+        // TODO: fix this not elegant code
+        if variantRowAdapters.isEmpty {
+            return nil
+        } else {
+            return RowAdapter(mainRowAdapter: nil, variantRowAdapters: variantRowAdapters)
+        }
+    }
 }
 
 final class _SQLSourceTable : _SQLSource {
@@ -321,46 +334,6 @@ final class _SQLSourceQuery: _SQLSource {
     
     func copy() -> _SQLSourceQuery {
         return _SQLSourceQuery(query: query, name: name)
-    }
-}
-
-final class _SQLSourceJoinHasOne: _SQLSource {
-    private let baseSource: _SQLSource
-    private let joinSource: _SQLSource
-    private let association: HasOneAssociation
-    
-    init(baseSource: _SQLSource, joinSource: _SQLSource, association: HasOneAssociation) {
-        self.baseSource = baseSource
-        self.joinSource = joinSource
-        self.association = association
-    }
-    
-    var name: String? {
-        get { return baseSource.name }
-        set { baseSource.name = newValue }
-    }
-    
-    var referencedSources: [_SQLSource] {
-        return [baseSource, joinSource, association.joinedTable]
-    }
-    
-    func numberOfColumns(db: Database) throws -> Int {
-        return try baseSource.numberOfColumns(db) + association.joinedTable.numberOfColumns(db)
-    }
-    
-    func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
-        var sql = try baseSource.sql(db, &bindings)
-        let joinedTableSQL = try association.joinedTable.sql(db, &bindings)
-        sql += " LEFT JOIN " + joinedTableSQL
-        sql += " ON "
-        sql += association.foreignKey.map({ (primaryColumn, foreignColumn) -> String in
-            "\(association.joinedTable.name!.quotedDatabaseIdentifier).\(foreignColumn.quotedDatabaseIdentifier) = \(joinSource.name!.quotedDatabaseIdentifier).\(primaryColumn.quotedDatabaseIdentifier)"
-        }).joinWithSeparator(" AND ")
-        return sql
-    }
-    
-    func copy() -> _SQLSourceJoinHasOne {
-        return _SQLSourceJoinHasOne(baseSource: baseSource, joinSource: joinSource, association: association)
     }
 }
 

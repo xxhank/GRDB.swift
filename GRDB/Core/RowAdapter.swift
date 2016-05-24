@@ -108,9 +108,7 @@ public struct RowAdapter {
         let variantRowAdapters = Dictionary(keyValueSequence: variantMappings.map { (identifier, mapping) in
             (identifier, RowAdapter(impl: DictionaryRowAdapterImpl(dictionary: mapping)))
             })
-        impl = NestedRowAdapterImpl(
-            mainRowAdapter: RowAdapter(impl: IdentityRowAdapterImpl()),
-            variantRowAdapters: variantRowAdapters)
+        self.init(mainRowAdapter: nil, variantRowAdapters: variantRowAdapters)
     }
     
     /// Creates an adapter with a column mapping, and eventual row variants.
@@ -136,19 +134,21 @@ public struct RowAdapter {
         let variantRowAdapters = Dictionary(keyValueSequence: variantMappings.map { (identifier, mapping) in
             (identifier, RowAdapter(impl: DictionaryRowAdapterImpl(dictionary: mapping)))
             })
-        impl = NestedRowAdapterImpl(
-            mainRowAdapter: RowAdapter(impl: DictionaryRowAdapterImpl(dictionary: mapping)),
-            variantRowAdapters: variantRowAdapters)
+        self.init(mainRowAdapter: RowAdapter(impl: DictionaryRowAdapterImpl(dictionary: mapping)), variantRowAdapters: variantRowAdapters)
     }
     
     init(fromColumnAtIndex index: Int) {
-        impl = SuffixRowAdapterImpl(index: index)
+        self.init(impl: SuffixRowAdapterImpl(index: index))
     }
     
-    init(variantRowAdapters: [String: RowAdapter]) {
-        impl = NestedRowAdapterImpl(
-            mainRowAdapter: RowAdapter(impl: IdentityRowAdapterImpl()),
-            variantRowAdapters: variantRowAdapters)
+    init(mainRowAdapter: RowAdapter?, variantRowAdapters: [String: RowAdapter]) {
+        if variantRowAdapters.isEmpty {
+            self.init(impl: mainRowAdapter?.impl ?? IdentityRowAdapterImpl())
+        } else {
+            self.init(impl: NestedRowAdapterImpl(
+                mainRowAdapter: mainRowAdapter ?? RowAdapter(impl: IdentityRowAdapterImpl()),
+                variantRowAdapters: variantRowAdapters))
+        }
     }
     
     private init(impl: RowAdapterImpl) {
@@ -226,10 +226,7 @@ private struct NestedRowAdapterImpl: RowAdapterImpl {
     
     func variantBindings(statement statement: SelectStatement) throws -> [String: AdapterRowImpl.Binding] {
         let variantBindings = try variantRowAdapters.map { (identifier: String, adapter: RowAdapter) -> (String, AdapterRowImpl.Binding) in
-            let variantBinding = try AdapterRowImpl.Binding(
-                columnsAdapter: ColumnsAdapter(columnBaseIndexes: adapter.columnBaseIndexes(statement: statement)),
-                variantBindings: [:])
-            return (identifier, variantBinding)
+            return try (identifier, adapter.binding(with: statement))
         }
         return Dictionary(keyValueSequence: variantBindings)
     }
