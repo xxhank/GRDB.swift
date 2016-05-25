@@ -64,7 +64,7 @@ class HasOneAssociationTests: GRDBTestCase {
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
             let request = rootTable.join(association)
-            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\"")
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend\" ON \"friend\".\"friendID\" = \"persons\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
                 Row.fetchAll(db, request)
@@ -109,7 +109,7 @@ class HasOneAssociationTests: GRDBTestCase {
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = HasOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
             let request = rootTable.join(association.join(association))
-            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".*, \"persons2\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"friendID\" = \"persons0\".\"id\" LEFT JOIN \"persons\" \"persons2\" ON \"persons2\".\"friendID\" = \"persons1\".\"id\"")
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend0\".*, \"friend1\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend0\" ON \"friend0\".\"friendID\" = \"persons\".\"id\" LEFT JOIN \"persons\" \"friend1\" ON \"friend1\".\"friendID\" = \"friend0\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
                 Row.fetchAll(db, request)

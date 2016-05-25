@@ -64,7 +64,7 @@ class BelongsToAssociationTests: GRDBTestCase {
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = BelongsToAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
             let request = rootTable.join(association)
-            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"id\" = \"persons0\".\"friendID\"")
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend\" ON \"friend\".\"id\" = \"persons\".\"friendID\"")
             
             let rows = dbQueue.inDatabase { db in
                 Row.fetchAll(db, request)
@@ -109,7 +109,7 @@ class BelongsToAssociationTests: GRDBTestCase {
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = BelongsToAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
             let request = rootTable.join(association.join(association))
-            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".*, \"persons2\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"id\" = \"persons0\".\"friendID\" LEFT JOIN \"persons\" \"persons2\" ON \"persons2\".\"id\" = \"persons1\".\"friendID\"")
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend0\".*, \"friend1\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend0\" ON \"friend0\".\"id\" = \"persons\".\"friendID\" LEFT JOIN \"persons\" \"friend1\" ON \"friend1\".\"id\" = \"friend0\".\"friendID\"")
             
             let rows = dbQueue.inDatabase { db in
                 Row.fetchAll(db, request)

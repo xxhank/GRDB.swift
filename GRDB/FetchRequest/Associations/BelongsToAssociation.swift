@@ -8,7 +8,7 @@ public struct BelongsToAssociation {
     
     /// TODO
     public init(name: String, tableName: String, foreignKey: [String: String]) {
-        self.init(name: name, ownerSource: _SQLSourceTable(tableName: tableName, alias: nil), foreignKey: foreignKey)
+        self.init(name: name, ownerSource: _SQLSourceTable(tableName: tableName, alias: ((name == tableName) ? nil : name)), foreignKey: foreignKey)
     }
     
     init(name: String, ownerSource: _SQLSourceTable, foreignKey: [String: String]) {
