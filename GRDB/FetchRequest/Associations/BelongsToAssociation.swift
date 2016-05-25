@@ -62,7 +62,7 @@ final class _SQLSourceJoinBelongsTo: _SQLSource {
     }
     
     var referencedSources: [_SQLSource] {
-        return [baseSource, ownedSource, ownerSource]
+        return baseSource.referencedSources + ownedSource.referencedSources + ownerSource.referencedSources
     }
     
     func numberOfColumns(db: Database) throws -> Int {

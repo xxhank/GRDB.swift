@@ -39,7 +39,7 @@ extension HasOneAssociation : Association {
     }
 }
 
-final class _SQLSourceJoinHasOne: _SQLSource {
+final class _SQLSourceJoinHasOne : _SQLSource {
     private let baseSource: _SQLSource
     private let ownedSource: _SQLSource
     private let ownerSource: _SQLSource
@@ -62,7 +62,7 @@ final class _SQLSourceJoinHasOne: _SQLSource {
     }
     
     var referencedSources: [_SQLSource] {
-        return [baseSource, ownerSource, ownedSource]
+        return baseSource.referencedSources + ownerSource.referencedSources + ownedSource.referencedSources
     }
     
     func numberOfColumns(db: Database) throws -> Int {

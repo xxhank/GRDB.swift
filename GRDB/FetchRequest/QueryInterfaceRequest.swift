@@ -64,7 +64,7 @@ extension QueryInterfaceRequest where T: RowConvertible {
     /// remaining elements are undefined.
     @warn_unused_result
     public func fetch(db: Database) -> DatabaseSequence<T> {
-        return try! T.fetch(selectStatement(db))
+        return T.fetch(db, self)
     }
     
     /// Returns an array of values fetched from a fetch request.
