@@ -40,12 +40,13 @@ extension CompoundAssociation : Association {
 }
 
 extension QueryInterfaceRequest {
-    /// TODO
+    /// TODO: doc
     public func join(associations: Association...) -> QueryInterfaceRequest<T> {
         return join(associations)
     }
     
-    /// TODO
+    /// TODO: doc
+    /// TODO: test that request.join([assoc1, assoc2]) <=> request.join([assoc1]).join([assoc2]) 
     public func join(associations: [Association]) -> QueryInterfaceRequest<T> {
         var query = self.query
         let source = query.source!
