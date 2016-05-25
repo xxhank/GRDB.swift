@@ -7,7 +7,7 @@ import XCTest
 
 class BelongsToAssociationTests: GRDBTestCase {
     
-    func testAssociation() {
+    func testJoin() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
@@ -49,6 +49,88 @@ class BelongsToAssociationTests: GRDBTestCase {
                 let variantPairs: [(String, DatabaseValueConvertible?)] = [("id", nil), ("name", nil)]
                 XCTAssertEqual(Array(variant.columnNames), variantPairs.map { $0.0 })
                 XCTAssertEqual(Array(variant.databaseValues), variantPairs.map { $1?.databaseValue ?? .Null })
+            }
+        }
+    }
+    
+    func testRecursiveJoin() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                try db.execute("CREATE TABLE persons (id INTEGER PRIMARY KEY, name TEXT, friendID INTEGER REFERENCES persons(id))")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (1, 'Arthur', NULL)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
+            }
+            let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let association = BelongsToAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
+            let request = rootTable.join(association)
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"id\" = \"persons0\".\"friendID\"")
+            
+            let rows = dbQueue.inDatabase { db in
+                Row.fetchAll(db, request)
+            }
+            XCTAssertEqual(rows.count, 2)
+            
+            do {
+                let row = rows[0]
+                let rowPairs: [(String, DatabaseValueConvertible?)] = [("id", 1), ("name", "Arthur"), ("friendID", nil), ("id", nil), ("name", nil), ("friendID", nil)]
+                XCTAssertEqual(Array(row.columnNames), rowPairs.map { $0.0 })
+                XCTAssertEqual(Array(row.databaseValues), rowPairs.map { $1?.databaseValue ?? .Null })
+                
+                let variant = row.variant(named: association.name)!
+                let variantPairs: [(String, DatabaseValueConvertible?)] = [("id", nil), ("name", nil), ("friendID", nil)]
+                XCTAssertEqual(Array(variant.columnNames), variantPairs.map { $0.0 })
+                XCTAssertEqual(Array(variant.databaseValues), variantPairs.map { $1?.databaseValue ?? .Null })
+            }
+            
+            do {
+                let row = rows[1]
+                let rowPairs: [(String, DatabaseValueConvertible?)] = [("id", 2), ("name", "Barbara"), ("friendID", 1), ("id", 1), ("name", "Arthur"), ("friendID", nil)]
+                XCTAssertEqual(Array(row.columnNames), rowPairs.map { $0.0 })
+                XCTAssertEqual(Array(row.databaseValues), rowPairs.map { $1?.databaseValue ?? .Null })
+                
+                let variant = row.variant(named: association.name)!
+                let variantPairs: [(String, DatabaseValueConvertible?)] = [("id", 1), ("name", "Arthur"), ("friendID", nil)]
+                XCTAssertEqual(Array(variant.columnNames), variantPairs.map { $0.0 })
+                XCTAssertEqual(Array(variant.databaseValues), variantPairs.map { $1?.databaseValue ?? .Null })
+            }
+        }
+    }
+    
+    func testNestedRecursiveJoin() {
+        assertNoError {
+            let dbQueue = try makeDatabaseQueue()
+            try dbQueue.inDatabase { db in
+                try db.execute("CREATE TABLE persons (id INTEGER PRIMARY KEY, name TEXT, friendID INTEGER REFERENCES persons(id))")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (1, 'Arthur', NULL)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (2, 'Barbara', 1)")
+                try db.execute("INSERT INTO persons (id, name, friendID) VALUES (3, 'Craig', 2)")
+            }
+            let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
+            let association = BelongsToAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
+            let request = rootTable.join(association.join(association))
+            XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons0\".*, \"persons1\".*, \"persons2\".* FROM \"persons\" \"persons0\" LEFT JOIN \"persons\" \"persons1\" ON \"persons1\".\"id\" = \"persons0\".\"friendID\" LEFT JOIN \"persons\" \"persons2\" ON \"persons2\".\"id\" = \"persons1\".\"friendID\"")
+            
+            let rows = dbQueue.inDatabase { db in
+                Row.fetchAll(db, request)
+            }
+            XCTAssertEqual(rows.count, 3)
+            
+            do {
+                let row = rows[2]
+                let rowPairs: [(String, DatabaseValueConvertible?)] = [("id", 3), ("name", "Craig"), ("friendID", 2), ("id", 2), ("name", "Barbara"), ("friendID", 1), ("id", 1), ("name", "Arthur"), ("friendID", nil)]
+                XCTAssertEqual(Array(row.columnNames), rowPairs.map { $0.0 })
+                XCTAssertEqual(Array(row.databaseValues), rowPairs.map { $1?.databaseValue ?? .Null })
+                
+                let variant = row.variant(named: association.name)!
+                let variantPairs: [(String, DatabaseValueConvertible?)] = [("id", 2), ("name", "Barbara"), ("friendID", 1), ("id", 1), ("name", "Arthur"), ("friendID", nil)]
+                XCTAssertEqual(Array(variant.columnNames), variantPairs.map { $0.0 })
+                XCTAssertEqual(Array(variant.databaseValues), variantPairs.map { $1?.databaseValue ?? .Null })
+                
+                let variant2 = variant.variant(named: association.name)!
+                let variant2Pairs: [(String, DatabaseValueConvertible?)] = [("id", 1), ("name", "Arthur"), ("friendID", nil)]
+                XCTAssertEqual(Array(variant2.columnNames), variant2Pairs.map { $0.0 })
+                XCTAssertEqual(Array(variant2.databaseValues), variant2Pairs.map { $1?.databaseValue ?? .Null })
             }
         }
     }

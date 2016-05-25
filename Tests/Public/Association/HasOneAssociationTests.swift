@@ -7,7 +7,7 @@ import XCTest
 
 class HasOneAssociationTests: GRDBTestCase {
     
-    func testAssociation() {
+    func testJoin() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
@@ -53,7 +53,7 @@ class HasOneAssociationTests: GRDBTestCase {
         }
     }
     
-    func testRecursiveAssociation() {
+    func testRecursiveJoin() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
@@ -97,7 +97,7 @@ class HasOneAssociationTests: GRDBTestCase {
         }
     }
     
-    func testNestedRecursiveAssociation() {
+    func testNestedRecursiveJoin() {
         assertNoError {
             let dbQueue = try makeDatabaseQueue()
             try dbQueue.inDatabase { db in
