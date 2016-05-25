@@ -25,6 +25,7 @@ private final class Person : RowConvertible, TableMapping {
     }
     
     init(_ row: Row) {
+        print("Person.init:\(row), \(Person.birthCountry.name):\(row.variant(named: Person.birthCountry.name)), \(Person.ruledCountry.name):\(row.variant(named: Person.ruledCountry.name))")
         id = row.value(named: "id")
         name = row.value(named: "name")
         birthCountryIsoCode = row.value(named: "birthCountryIsoCode")
@@ -35,7 +36,7 @@ private final class Person : RowConvertible, TableMapping {
             birthCountry = nil
         }
         
-        if let ruledCountryRow = row.variant(named: Person.ruledCountry.name) {
+        if let ruledCountryRow = row.variant(named: Person.ruledCountry.name) where ruledCountryRow.value(named: "isoCode") != nil {
             ruledCountry = Country(ruledCountryRow)
         } else {
             ruledCountry = nil
@@ -52,6 +53,7 @@ private final class Country: RowConvertible {
     static let leader = BelongsToAssociation(name: "leader", tableName: "persons", foreignKey: ["leaderID": "id"])
     
     init(_ row: Row) {
+        print("Country.init:\(row), \(Country.leader.name):\(row.variant(named: Country.leader.name))")
         isoCode = row.value(named: "isoCode")
         name = row.value(named: "name")
         leaderID = row.value(named: "leaderID")
@@ -85,21 +87,20 @@ class ComplexAssociationTests: GRDBTestCase {
             }
             
             dbQueue.inDatabase { db in
-                // SELECT "persons".*,
-                //        "birthCountry".*,
-                //        "leader".*,
-                //        "ruledCountry0".*,
-                //        "ruledCountry1".*
+                // SELECT "persons".*, "ruledCountry0".*, "leader0".*, "birthCountry".*, "leader1".*, "ruledCountry1".*
                 // FROM "persons"
+                // LEFT JOIN "countries" "ruledCountry0" ON "ruledCountry0"."leaderID" = "persons"."id"
+                // LEFT JOIN "persons" "leader0" ON "leader0"."id" = "ruledCountry0"."leaderID"
                 // LEFT JOIN "countries" "birthCountry" ON "birthCountry"."isoCode" = "persons"."birthCountryIsoCode"
-                // LEFT JOIN "persons" "leader" ON "leader"."id" = "birthCountry"."leaderID"
-                // LEFT JOIN "countries" "ruledCountry0" ON "ruledCountry0"."leaderID" = "leader"."id"
-                // LEFT JOIN "countries" "ruledCountry1" ON "ruledCountry1"."leaderID" = "persons"."id"
+                // LEFT JOIN "persons" "leader1" ON "leader1"."id" = "birthCountry"."leaderID"
+                // LEFT JOIN "countries" "ruledCountry1" ON "ruledCountry1"."leaderID" = "leader1"."id"
+
                 let request = Person.all()
+                    .join(Person.ruledCountry
+                        .join(Country.leader))
                     .join(Person.birthCountry
                         .join(Country.leader
                             .join(Person.ruledCountry)))
-                    .join(Person.ruledCountry)
                 
                 // TODO: sort persons using SQL
                 let persons = request.fetchAll(db).sort { $0.id < $1.id }
@@ -107,19 +108,21 @@ class ComplexAssociationTests: GRDBTestCase {
                 XCTAssertEqual(persons.count, 3)
                 
                 XCTAssertEqual(persons[0].name, "Arthur")
-                XCTAssertNil(persons[1].ruledCountry)
+                XCTAssertNil(persons[0].ruledCountry)
                 XCTAssertEqual(persons[0].birthCountry!.name, "France")
                 XCTAssertEqual(persons[0].birthCountry!.leader!.name, "Barbara")
                 XCTAssertEqual(persons[0].birthCountry!.leader!.ruledCountry!.name, "France")
                 
                 XCTAssertEqual(persons[1].name, "Barbara")
-                XCTAssertEqual(persons[0].ruledCountry!.name, "France")
+                XCTAssertEqual(persons[1].ruledCountry!.name, "France")
+                XCTAssertEqual(persons[1].ruledCountry!.leader!.name, "Barbara")
                 XCTAssertEqual(persons[1].birthCountry!.name, "France")
                 XCTAssertEqual(persons[1].birthCountry!.leader!.name, "Barbara")
                 XCTAssertEqual(persons[1].birthCountry!.leader!.ruledCountry!.name, "France")
                 
                 XCTAssertEqual(persons[2].name, "John")
                 XCTAssertEqual(persons[2].ruledCountry!.name, "United States")
+                XCTAssertEqual(persons[2].ruledCountry!.leader!.name, "John")
                 XCTAssertEqual(persons[2].birthCountry!.name, "United States")
                 XCTAssertEqual(persons[2].birthCountry!.leader!.name, "John")
                 XCTAssertEqual(persons[2].birthCountry!.leader!.ruledCountry!.name, "United States")

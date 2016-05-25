@@ -1,7 +1,7 @@
 /// TODO
 public protocol Association {
     /// TODO
-    func joinedQuery(query: _SQLSelectQuery, joinOrigin: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
+    func joinedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
     /// TODO
     func fork() -> Self
 }
@@ -25,10 +25,10 @@ struct CompoundAssociation {
 }
 
 extension CompoundAssociation : Association {
-    func joinedQuery(query: _SQLSelectQuery, joinOrigin: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
-        var (query, baseTarget) = baseAssociation.joinedQuery(query, joinOrigin: joinOrigin)
+    func joinedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
+        var (query, baseTarget) = baseAssociation.joinedQuery(query, leftSource: leftSource)
         for association in joinedAssociations {
-            (query, _) = association.joinedQuery(query, joinOrigin: baseTarget)
+            (query, _) = association.joinedQuery(query, leftSource: baseTarget)
         }
         return (query, baseTarget)
     }
@@ -49,9 +49,9 @@ extension QueryInterfaceRequest {
     /// TODO: test that request.join([assoc1, assoc2]) <=> request.join([assoc1]).join([assoc2]) 
     public func join(associations: [Association]) -> QueryInterfaceRequest<T> {
         var query = self.query
-        let source = query.source!
+        let leftSource = query.source!.leftSourceForJoins
         for association in associations {
-            (query, _) = association.joinedQuery(query, joinOrigin: source)
+            (query, _) = association.joinedQuery(query, leftSource: leftSource)
         }
         return QueryInterfaceRequest(query: query)
     }

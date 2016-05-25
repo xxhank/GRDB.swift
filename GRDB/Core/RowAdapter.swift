@@ -159,6 +159,10 @@ public struct RowAdapter {
         return try impl.binding(with: statement)
     }
     
+    func addingVariantAdapter(adapter: RowAdapter, named variantName: String) -> RowAdapter {
+        return impl.adapterByAddingVariantAdapter(adapter, named: variantName)
+    }
+    
     // Return an array [(baseRowIndex, mappedColumn), ...] ordered like the statement columns.
     private func columnBaseIndexes(statement statement: SelectStatement) throws -> [(Int, String)] {
         return try impl.columnBaseIndexes(statement: statement)
@@ -171,6 +175,8 @@ private protocol RowAdapterImpl {
     
     // Bindings for variants
     func variantBindings(statement statement: SelectStatement) throws -> [String: AdapterRowImpl.Binding]
+    
+    func adapterByAddingVariantAdapter(adapter: RowAdapter, named variantName: String) -> RowAdapter
 }
 
 extension RowAdapterImpl {
@@ -184,6 +190,11 @@ extension RowAdapterImpl {
     // default implementation
     func variantBindings(statement statement: SelectStatement) throws -> [String: AdapterRowImpl.Binding] {
         return [:]
+    }
+    
+    // default implementation
+    func adapterByAddingVariantAdapter(adapter: RowAdapter, named variantName: String) -> RowAdapter {
+        return RowAdapter(mainRowAdapter: RowAdapter(impl: self), variantRowAdapters: [variantName: adapter])
     }
 }
 
@@ -229,6 +240,12 @@ private struct NestedRowAdapterImpl: RowAdapterImpl {
             return try (identifier, adapter.binding(with: statement))
         }
         return Dictionary(keyValueSequence: variantBindings)
+    }
+    
+    func adapterByAddingVariantAdapter(adapter: RowAdapter, named variantName: String) -> RowAdapter {
+        var variantRowAdapters = self.variantRowAdapters
+        variantRowAdapters[variantName] = adapter
+        return RowAdapter(mainRowAdapter: mainRowAdapter, variantRowAdapters: variantRowAdapters)
     }
 }
 
