@@ -1,11 +1,9 @@
 /// TODO
-public protocol Association {
-//    /// TODO
-//    @warn_unused_result
-//    func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
+public protocol _Association {
     /// TODO
     @warn_unused_result
     func fork() -> Self
+    
     /// TODO
     @warn_unused_result
     func aliased(alias: String) -> Association
@@ -17,10 +15,21 @@ public protocol Association {
     /// TODO
     var referencedSources: [_SQLSource] { get }
     
+    /// TODO
     var rightSource: _SQLSource { get }
     
     /// TODO
+    var selection: [_SQLSelectable] { get }
+    
+    /// TODO
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?], leftSourceName: String) throws -> String
+    
+    /// TODO
+    func adapter(adapter: RowAdapter, merge: Bool, inout selectionIndex: Int, columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter
+}
+
+/// TODO
+public protocol Association : _Association {
 }
 
 extension Association {
@@ -32,6 +41,7 @@ extension Association {
     }
     
     /// TODO
+    /// extension Method
     @warn_unused_result
     public func include(associations: [Association]) -> Association {
         return ChainedAssociation(baseAssociation: self, rightAssociations: associations.map { $0.fork() })
@@ -44,14 +54,6 @@ struct ChainedAssociation {
 }
 
 extension ChainedAssociation : Association {
-//    func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
-//        var (query, baseTarget) = baseAssociation.includedQuery(query, leftSource: leftSource)
-//        for association in rightAssociations {
-//            (query, _) = association.includedQuery(query, leftSource: baseTarget)
-//        }
-//        return (query, baseTarget)
-//    }
-    
     /// TODO
     func fork() -> ChainedAssociation {
         return ChainedAssociation(baseAssociation: baseAssociation.fork(), rightAssociations: rightAssociations.map { $0.fork() })
@@ -79,12 +81,36 @@ extension ChainedAssociation : Association {
     }
     
     /// TODO
+    var selection: [_SQLSelectable] {
+        return rightAssociations.reduce(baseAssociation.selection) { (selection, association) in
+            selection + association.selection
+        }
+    }
+    
+    /// TODO
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?], leftSourceName: String) throws -> String {
         var sql = try baseAssociation.sql(db, &bindings, leftSourceName: leftSourceName)
-        sql += try rightAssociations.map {
-            try $0.sql(db, &bindings, leftSourceName: baseAssociation.rightSource.name!)
-        }.joinWithSeparator(" ")
+        if !rightAssociations.isEmpty {
+            sql += " "
+            sql += try rightAssociations.map {
+                try $0.sql(db, &bindings, leftSourceName: baseAssociation.rightSource.name!)
+                }.joinWithSeparator(" ")
+        }
         return sql
+    }
+    
+    /// TODO
+    func adapter(adapter: RowAdapter, merge: Bool, inout selectionIndex: Int, columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter {
+        let adapter = baseAssociation.adapter(adapter, merge: merge, selectionIndex: &selectionIndex, columnIndexForSelectionIndex: columnIndexForSelectionIndex)
+        return rightAssociations.reduce(adapter) { (adapter, association) in
+            return association.adapter(adapter, merge: false, selectionIndex: &selectionIndex, columnIndexForSelectionIndex: columnIndexForSelectionIndex)
+        }
+    }
+}
+
+extension ChainedAssociation : CustomStringConvertible {
+    var description: String {
+        return ([baseAssociation] + rightAssociations).map { "\($0)" }.joinWithSeparator(" ")
     }
 }
 
@@ -110,20 +136,6 @@ public struct OneToOneAssociation {
 }
 
 extension OneToOneAssociation : Association {
-//    /// TODO
-//    public func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
-//        var query = query
-//        query.source = _SQLSourceJoin(
-//            baseSource: query.source!,
-//            leftSource: leftSource,
-//            rightSource: rightSource,
-//            foreignKey: foreignKey,
-//            variantName: name,
-//            variantSelectionIndex: query.selection.count)
-//        query.selection.append(_SQLResultColumn.Star(rightSource))
-//        return (query, rightSource)
-//    }
-    
     /// TODO
     public func fork() -> OneToOneAssociation {
         return OneToOneAssociation(name: name, rightSource: rightSource.copy(), foreignKey: foreignKey)
@@ -149,12 +161,35 @@ extension OneToOneAssociation : Association {
     }
     
     /// TODO
+    public var selection: [_SQLSelectable] {
+        return [_SQLResultColumn.Star(rightSource)]
+    }
+    
+    /// TODO
     public func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?], leftSourceName: String) throws -> String {
         var sql = try "LEFT JOIN " + rightSource.sql(db, &bindings) + " ON "
         sql += foreignKey.map({ (leftColumn, rightColumn) -> String in
             "\(rightSource.name!.quotedDatabaseIdentifier).\(rightColumn.quotedDatabaseIdentifier) = \(leftSourceName.quotedDatabaseIdentifier).\(leftColumn.quotedDatabaseIdentifier)"
         }).joinWithSeparator(" AND ")
         return sql
+    }
+    
+    /// TODO
+    public func adapter(adapter: RowAdapter, merge: Bool, inout selectionIndex: Int, columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter {
+        selectionIndex += 1
+        let columnIndex = columnIndexForSelectionIndex[selectionIndex]!
+        let variantAdapter = RowAdapter(fromColumnAtIndex: columnIndex)
+        if merge {
+            return adapter.addingVariantAdapter(variantAdapter, named: name)
+        } else {
+            return RowAdapter(mainRowAdapter: adapter, variantRowAdapters: [name: variantAdapter])
+        }
+    }
+}
+
+extension OneToOneAssociation : CustomStringConvertible {
+    public var description: String {
+        return "-> \(name):\(rightSource)"
     }
 }
 
@@ -173,15 +208,10 @@ extension QueryInterfaceRequest {
         var source = query.source!
         for association in associations {
             source = source.include(association)
+            query.selection.appendContentsOf(association.selection)
         }
         query.source = source
         return QueryInterfaceRequest(query: query)
-//        var query = self.query
-//        let leftSource = query.source!.leftSourceForJoins
-//        for association in associations {
-//            (query, _) = association.includedQuery(query, leftSource: leftSource)
-//        }
-//        return QueryInterfaceRequest(query: query)
     }
 }
 
