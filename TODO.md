@@ -5,6 +5,7 @@
     - [ ] Person.all().aliased("customPersonAlias").include(Person.birthCountry) 
 - [ ] Association: Type.join() instead of Type.all().join() See ComplexAssociationTests
 - [ ] Association: .include() adds a variant, .join() does not add a variant
+– [?] Association: distinguishing BelongsTo and HasOne could help verifying that the right table of belongsTo has a unique index on the joined columns. For HasOne, we have to trust the user. 
 - [ ] FetchedRecordsController: document that identity comparison is only required for table view events.
 - [ ] FetchedRecordsController: see if we can replace identity comparison function with a function that returns an Equatable value (beware the generics trouble). See if this can help optimize memory use, and use a sortedMerge() algorithm.
 - [ ] GRDBCipher: remove limitations on iOS or OS X versions
