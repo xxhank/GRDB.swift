@@ -229,7 +229,7 @@ public struct _SQLSelectQuery {
             }
         }
         
-        return source.adapter(columnIndexForSelectionIndex, variantRowAdapters: [:])
+        return source.adapter(columnIndexForSelectionIndex)
     }
     
     func numberOfColumns(db: Database) throws -> Int {
@@ -250,24 +250,35 @@ public struct _SQLSelectQuery {
 /// TODO
 public protocol _SQLSource: class {
     var name: String? { get set }
-    var leftSourceForJoins: _SQLSource { get }
+//    var leftSourceForJoins: _SQLSource { get }
     var referencedSources: [_SQLSource] { get }
     func numberOfColumns(db: Database) throws -> Int
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
-    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter?
     func copy() -> Self
+    
+    func include(association: Association) -> _SQLSource
+    func adapter(columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter?
 }
 
 extension _SQLSource {
     // Default implementation
-    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter? {
-        // TODO: fix this not elegant code
-        if variantRowAdapters.isEmpty {
-            return nil
-        } else {
-            return RowAdapter(mainRowAdapter: nil, variantRowAdapters: variantRowAdapters)
-        }
+    func include(association: Association) -> _SQLSource {
+        return _SQLJoinTree(leftSource: self, associations: [association])
     }
+    
+    // Default implementation
+    func adapter(columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter? {
+        return nil
+    }
+//    // Default implementation
+//    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter? {
+//        // TODO: fix this not elegant code
+//        if variantRowAdapters.isEmpty {
+//            return nil
+//        } else {
+//            return RowAdapter(mainRowAdapter: nil, variantRowAdapters: variantRowAdapters)
+//        }
+//    }
 }
 
 final class _SQLSourceTable : _SQLSource {
@@ -282,10 +293,6 @@ final class _SQLSourceTable : _SQLSource {
     var name : String? {
         get { return alias ?? tableName }
         set { alias = newValue }
-    }
-    
-    var leftSourceForJoins: _SQLSource {
-        return self
     }
     
     var referencedSources: [_SQLSource] {
@@ -328,10 +335,6 @@ final class _SQLSourceQuery: _SQLSource {
         self.name = name
     }
     
-    var leftSourceForJoins: _SQLSource {
-        return self
-    }
-    
     var referencedSources: [_SQLSource] {
         if let source = query.source {
             return [self] + source.referencedSources
@@ -356,78 +359,136 @@ final class _SQLSourceQuery: _SQLSource {
     }
 }
 
-final class _SQLSourceJoin: _SQLSource {
-    private let baseSource: _SQLSource
+final class _SQLJoinTree: _SQLSource {
     private let leftSource: _SQLSource
-    private let rightSource: _SQLSource
-    private let foreignKey: [String: String] // [leftColumn: rightColumn]
-    private let variantName: String
-    private let variantSelectionIndex: Int
+    private let associations: [Association]
     
-    init(baseSource: _SQLSource, leftSource: _SQLSource, rightSource: _SQLSource, foreignKey: [String: String], variantName: String, variantSelectionIndex: Int) {
-        self.baseSource = baseSource
+    init(leftSource: _SQLSource, associations: [Association]) {
         self.leftSource = leftSource
-        self.rightSource = rightSource
-        self.foreignKey = foreignKey
-        self.variantName = variantName
-        self.variantSelectionIndex = variantSelectionIndex
+        self.associations = associations
     }
     
-    var name: String? {
-        get { return rightSource.name }
-        set { rightSource.name = newValue }
-    }
-    
-    var leftSourceForJoins: _SQLSource {
-        return baseSource.leftSourceForJoins
-    }
-    
-    var variantSource: _SQLSource {
-        return leftSource
+    var name : String? {
+        get { return leftSource.name }
+        set { leftSource.name = newValue }
     }
     
     var referencedSources: [_SQLSource] {
-        return baseSource.referencedSources + leftSource.referencedSources + rightSource.referencedSources
+        var result = leftSource.referencedSources
+        for association in associations {
+            result += association.referencedSources
+        }
+        return result
     }
     
     func numberOfColumns(db: Database) throws -> Int {
-        fatalError("TODO: this code is never run and this method should not exist")
+        var result = try leftSource.numberOfColumns(db)
+        for association in associations {
+            result += try association.numberOfColumns(db)
+        }
+        return result
     }
     
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
-        var sql = try baseSource.sql(db, &bindings)
-        let rightSourceSQL = try rightSource.sql(db, &bindings)
-        sql += " LEFT JOIN " + rightSourceSQL + " ON "
-        sql += foreignKey.map({ (leftColumn, rightColumn) -> String in
-            "\(rightSource.name!.quotedDatabaseIdentifier).\(rightColumn.quotedDatabaseIdentifier) = \(leftSource.name!.quotedDatabaseIdentifier).\(leftColumn.quotedDatabaseIdentifier)"
-        }).joinWithSeparator(" AND ")
+        var sql = try leftSource.sql(db, &bindings)
+        for association in associations {
+            sql += try " " + association.sql(db, &bindings, leftSourceName: leftSource.name!)
+        }
         return sql
     }
     
-    func copy() -> _SQLSourceJoin {
-        fatalError("TODO: this code is never run and this method should not exist")
+    func include(association: Association) -> _SQLSource {
+        var associations = self.associations
+        associations.append(association)
+        return _SQLJoinTree(leftSource: leftSource, associations: associations)
     }
     
-    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter? {
-        let columnIndex = columnIndexForSelectionIndex[variantSelectionIndex]!
-        
-//        if mergeVariants {
-//            let adapter = baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [:], mergeVariants: variantSource === baseSource.variantSource) ?? RowAdapter(mainRowAdapter: nil, variantRowAdapters: [:])
-//            return adapter.addingVariantAdapter(RowAdapter(fromColumnAtIndex: columnIndex), named: variantName)
-//        } else {
-//            let adapter = RowAdapter(mainRowAdapter: RowAdapter(fromColumnAtIndex: columnIndex), variantRowAdapters: variantRowAdapters)
-//            return baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [variantName: adapter], mergeVariants: variantSource === baseSource.variantSource)
-//        }
-        let adapter = RowAdapter(mainRowAdapter: RowAdapter(fromColumnAtIndex: columnIndex), variantRowAdapters: variantRowAdapters)
-        return baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [variantName: adapter])
+    func copy() -> _SQLJoinTree {
+        return _SQLJoinTree(leftSource: leftSource.copy(), associations: associations.map { $0.fork() })
     }
+    
+    func adapter(columnIndexForSelectionIndex: [Int: Int]) -> RowAdapter? {
+        return nil
+//        let adapter = leftSource.adapter(columnIndexForSelectionIndex) ?? RowAdapter(mainRowAdapter: nil, variantRowAdapters: [:])
+//        for association in associations {
+//            adapter = association.
+//        }
+    }
+
 }
 
-extension _SQLSourceJoin : CustomStringConvertible {
-    var description: String {
-        return "<base: \(baseSource) left:\(leftSource) right:\(rightSource)>"
-    }
-}
+//final class _SQLSourceJoin: _SQLSource {
+//    private let baseSource: _SQLSource
+//    private let leftSource: _SQLSource
+//    private let rightSource: _SQLSource
+//    private let foreignKey: [String: String] // [leftColumn: rightColumn]
+//    private let variantName: String
+//    private let variantSelectionIndex: Int
+//    
+//    init(baseSource: _SQLSource, leftSource: _SQLSource, rightSource: _SQLSource, foreignKey: [String: String], variantName: String, variantSelectionIndex: Int) {
+//        self.baseSource = baseSource
+//        self.leftSource = leftSource
+//        self.rightSource = rightSource
+//        self.foreignKey = foreignKey
+//        self.variantName = variantName
+//        self.variantSelectionIndex = variantSelectionIndex
+//    }
+//    
+//    var name: String? {
+//        get { return rightSource.name }
+//        set { rightSource.name = newValue }
+//    }
+//    
+////    var leftSourceForJoins: _SQLSource {
+////        return baseSource.leftSourceForJoins
+////    }
+//    
+//    var variantSource: _SQLSource {
+//        return leftSource
+//    }
+//    
+//    var referencedSources: [_SQLSource] {
+//        return baseSource.referencedSources + leftSource.referencedSources + rightSource.referencedSources
+//    }
+//    
+//    func numberOfColumns(db: Database) throws -> Int {
+//        fatalError("TODO: this code is never run and this method should not exist")
+//    }
+//    
+//    func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String {
+//        var sql = try baseSource.sql(db, &bindings)
+//        let rightSourceSQL = try rightSource.sql(db, &bindings)
+//        sql += " LEFT JOIN " + rightSourceSQL + " ON "
+//        sql += foreignKey.map({ (leftColumn, rightColumn) -> String in
+//            "\(rightSource.name!.quotedDatabaseIdentifier).\(rightColumn.quotedDatabaseIdentifier) = \(leftSource.name!.quotedDatabaseIdentifier).\(leftColumn.quotedDatabaseIdentifier)"
+//        }).joinWithSeparator(" AND ")
+//        return sql
+//    }
+//    
+//    func copy() -> _SQLSourceJoin {
+//        fatalError("TODO: this code is never run and this method should not exist")
+//    }
+//    
+////    func adapter(columnIndexForSelectionIndex: [Int: Int], variantRowAdapters: [String: RowAdapter]) -> RowAdapter? {
+////        let columnIndex = columnIndexForSelectionIndex[variantSelectionIndex]!
+////        
+//////        if mergeVariants {
+//////            let adapter = baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [:], mergeVariants: variantSource === baseSource.variantSource) ?? RowAdapter(mainRowAdapter: nil, variantRowAdapters: [:])
+//////            return adapter.addingVariantAdapter(RowAdapter(fromColumnAtIndex: columnIndex), named: variantName)
+//////        } else {
+//////            let adapter = RowAdapter(mainRowAdapter: RowAdapter(fromColumnAtIndex: columnIndex), variantRowAdapters: variantRowAdapters)
+//////            return baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [variantName: adapter], mergeVariants: variantSource === baseSource.variantSource)
+//////        }
+////        let adapter = RowAdapter(mainRowAdapter: RowAdapter(fromColumnAtIndex: columnIndex), variantRowAdapters: variantRowAdapters)
+////        return baseSource.adapter(columnIndexForSelectionIndex, variantRowAdapters: [variantName: adapter])
+////    }
+//}
+//
+//extension _SQLSourceJoin : CustomStringConvertible {
+//    var description: String {
+//        return "<base: \(baseSource) left:\(leftSource) right:\(rightSource)>"
+//    }
+//}
 
 
 // MARK: - _SQLSortDescriptorType
