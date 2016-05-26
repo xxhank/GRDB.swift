@@ -1,6 +1,8 @@
 – [ ] Associations: include two chained associations
 – [ ] Associations: mandatory true/false (JOIN vs LEFT JOIN)
 – [ ] Associations: allow to give an alias, so that one can use an alias in an ORDER BY clause
+    - [X] Person.all().include(Person.birthCountry.aliased("customCountryAlias"))
+    - [ ] Person.all().aliased("customPersonAlias").include(Person.birthCountry) 
 - [ ] Association: Type.join() instead of Type.all().join() See ComplexAssociationTests
 - [ ] Association: .include() adds a variant, .join() does not add a variant
 - [ ] FetchedRecordsController: document that identity comparison is only required for table view events.

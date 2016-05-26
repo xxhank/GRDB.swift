@@ -4,6 +4,8 @@ public protocol Association {
     func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
     /// TODO
     func fork() -> Self
+    /// TODO
+    func aliased(alias: String) -> Association
 }
 
 extension Association {
@@ -37,6 +39,10 @@ extension CompoundAssociation : Association {
     func fork() -> CompoundAssociation {
         return CompoundAssociation(baseAssociation: baseAssociation.fork(), includedAssociations: includedAssociations.map { $0.fork() })
     }
+    
+    func aliased(alias: String) -> Association {
+        return CompoundAssociation(baseAssociation: baseAssociation.aliased(alias), includedAssociations: includedAssociations)
+    }
 }
 
 /// TODO
@@ -56,6 +62,13 @@ public struct OneToOneAssociation {
         self.name = name
         self.rightSource = rightSource
         self.foreignKey = foreignKey
+    }
+    
+    /// TODO
+    public func aliased(alias: String) -> Association {
+        let rightSource = self.rightSource.copy()
+        rightSource.alias = alias
+        return OneToOneAssociation(name: name, rightSource: rightSource, foreignKey: foreignKey)
     }
 }
 
