@@ -83,7 +83,7 @@ class ComplexAssociationTests: GRDBTestCase {
             }
             
             dbQueue.inDatabase { db in
-                let request = Person.all()
+                let request = Person
                     .include(Person.birthCountry)
                     .order(sql: "\(Person.birthCountry.name).isoCode")
                 let persons = request.fetchAll(db)
@@ -112,7 +112,7 @@ class ComplexAssociationTests: GRDBTestCase {
             }
             
             dbQueue.inDatabase { db in
-                let request = Person.all()
+                let request = Person
                     .include(Person.birthCountry.aliased("foo"))
                     .order(sql: "foo.isoCode")
                 let persons = request.fetchAll(db)
@@ -145,7 +145,7 @@ class ComplexAssociationTests: GRDBTestCase {
 //            }
 //            
 //            dbQueue.inDatabase { db in
-//                let request = Person.all()
+//                let request = Person
 //                    .include(Person.ruledCountry)
 //                    .include(Person.birthCountry)
 //                
@@ -189,7 +189,7 @@ class ComplexAssociationTests: GRDBTestCase {
 //            }
 //            
 //            dbQueue.inDatabase { db in
-//                let request = Person.all()
+//                let request = Person
 //                    .include(Person.ruledCountry
 //                        .include(Country.leader))
 //                    .include(Person.birthCountry

@@ -97,6 +97,17 @@ extension QueryInterfaceRequest {
     
     // MARK: Request Derivation
     
+    /// TODO: documentation
+    /// TODO: test
+    @warn_unused_result
+    public func aliased(alias: String) -> QueryInterfaceRequest<T> {
+        var query = self.query
+        let source = query.source!
+        source.name = alias
+        query.source = source
+        return QueryInterfaceRequest(query: query)
+    }
+    
     /// Returns a new QueryInterfaceRequest with a new net of selected columns.
     @warn_unused_result
     public func select(selection: _SQLSelectable...) -> QueryInterfaceRequest<T> {
@@ -266,6 +277,13 @@ extension TableMapping {
     @warn_unused_result
     public static func all() -> QueryInterfaceRequest<Self> {
         return QueryInterfaceRequest(tableName: databaseTableName())
+    }
+    
+    /// TODO: documentation
+    /// TODO: test
+    @warn_unused_result
+    public static func aliased(alias: String) -> QueryInterfaceRequest<Self> {
+        return all().aliased(alias)
     }
     
     /// Returns a QueryInterfaceRequest which selects *selection*.

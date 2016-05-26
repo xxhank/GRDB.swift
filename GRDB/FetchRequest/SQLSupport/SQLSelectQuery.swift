@@ -251,7 +251,6 @@ public struct _SQLSelectQuery {
 public protocol _SQLSource: class {
     var name: String? { get set }
     var leftSourceForJoins: _SQLSource { get }
-    var variantSource: _SQLSource { get }
     var referencedSources: [_SQLSource] { get }
     func numberOfColumns(db: Database) throws -> Int
     func sql(db: Database, inout _ bindings: [DatabaseValueConvertible?]) throws -> String
@@ -286,10 +285,6 @@ final class _SQLSourceTable : _SQLSource {
     }
     
     var leftSourceForJoins: _SQLSource {
-        return self
-    }
-    
-    var variantSource: _SQLSource {
         return self
     }
     
@@ -334,10 +329,6 @@ final class _SQLSourceQuery: _SQLSource {
     }
     
     var leftSourceForJoins: _SQLSource {
-        return self
-    }
-    
-    var variantSource: _SQLSource {
         return self
     }
     

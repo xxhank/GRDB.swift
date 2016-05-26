@@ -1,22 +1,27 @@
 /// TODO
 public protocol Association {
     /// TODO
+    @warn_unused_result
     func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
     /// TODO
+    @warn_unused_result
     func fork() -> Self
     /// TODO
+    @warn_unused_result
     func aliased(alias: String) -> Association
 }
 
 extension Association {
     /// TODO
     /// extension Method
+    @warn_unused_result
     public func include(associations: Association...) -> Association {
         return include(associations)
     }
     
     /// TODO
-    func include(associations: [Association]) -> Association {
+    @warn_unused_result
+    public func include(associations: [Association]) -> Association {
         return CompoundAssociation(baseAssociation: self, includedAssociations: associations.map { $0.fork() })
     }
 }
@@ -63,13 +68,6 @@ public struct OneToOneAssociation {
         self.rightSource = rightSource
         self.foreignKey = foreignKey
     }
-    
-    /// TODO
-    public func aliased(alias: String) -> Association {
-        let rightSource = self.rightSource.copy()
-        rightSource.alias = alias
-        return OneToOneAssociation(name: name, rightSource: rightSource, foreignKey: foreignKey)
-    }
 }
 
 extension OneToOneAssociation : Association {
@@ -91,16 +89,26 @@ extension OneToOneAssociation : Association {
     public func fork() -> OneToOneAssociation {
         return OneToOneAssociation(name: name, rightSource: rightSource.copy(), foreignKey: foreignKey)
     }
+    
+    /// TODO
+    @warn_unused_result
+    public func aliased(alias: String) -> Association {
+        let rightSource = self.rightSource.copy()
+        rightSource.alias = alias
+        return OneToOneAssociation(name: name, rightSource: rightSource, foreignKey: foreignKey)
+    }
 }
 
 extension QueryInterfaceRequest {
     /// TODO: doc
+    @warn_unused_result
     public func include(associations: Association...) -> QueryInterfaceRequest<T> {
         return include(associations)
     }
     
     /// TODO: doc
     /// TODO: test that request.include([assoc1, assoc2]) <=> request.include([assoc1]).include([assoc2])
+    @warn_unused_result
     public func include(associations: [Association]) -> QueryInterfaceRequest<T> {
         var query = self.query
         let leftSource = query.source!.leftSourceForJoins
@@ -108,5 +116,19 @@ extension QueryInterfaceRequest {
             (query, _) = association.includedQuery(query, leftSource: leftSource)
         }
         return QueryInterfaceRequest(query: query)
+    }
+}
+
+extension TableMapping {
+    /// TODO: doc
+    @warn_unused_result
+    public static func include(associations: Association...) -> QueryInterfaceRequest<Self> {
+        return all().include(associations)
+    }
+    
+    /// TODO: doc
+    @warn_unused_result
+    public static func include(associations: [Association]) -> QueryInterfaceRequest<Self> {
+        return all().include(associations)
     }
 }
