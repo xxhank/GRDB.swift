@@ -1,7 +1,7 @@
 /// TODO
 public protocol Association {
     /// TODO
-    func joinedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
+    func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource)
     /// TODO
     func fork() -> Self
 }
@@ -9,33 +9,33 @@ public protocol Association {
 extension Association {
     /// TODO
     /// extension Method
-    public func join(associations: Association...) -> Association {
-        return join(associations)
+    public func include(associations: Association...) -> Association {
+        return include(associations)
     }
     
     /// TODO
-    func join(associations: [Association]) -> Association {
-        return CompoundAssociation(baseAssociation: self, joinedAssociations: associations.map { $0.fork() })
+    func include(associations: [Association]) -> Association {
+        return CompoundAssociation(baseAssociation: self, includedAssociations: associations.map { $0.fork() })
     }
 }
 
 struct CompoundAssociation {
     let baseAssociation: Association
-    let joinedAssociations: [Association]
+    let includedAssociations: [Association]
 }
 
 extension CompoundAssociation : Association {
-    func joinedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
-        var (query, baseTarget) = baseAssociation.joinedQuery(query, leftSource: leftSource)
-        for association in joinedAssociations {
-            (query, _) = association.joinedQuery(query, leftSource: baseTarget)
+    func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
+        var (query, baseTarget) = baseAssociation.includedQuery(query, leftSource: leftSource)
+        for association in includedAssociations {
+            (query, _) = association.includedQuery(query, leftSource: baseTarget)
         }
         return (query, baseTarget)
     }
     
     /// TODO
     func fork() -> CompoundAssociation {
-        return CompoundAssociation(baseAssociation: baseAssociation.fork(), joinedAssociations: joinedAssociations.map { $0.fork() })
+        return CompoundAssociation(baseAssociation: baseAssociation.fork(), includedAssociations: includedAssociations.map { $0.fork() })
     }
 }
 
@@ -61,7 +61,7 @@ public struct OneToOneAssociation {
 
 extension OneToOneAssociation : Association {
     /// TODO
-    public func joinedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
+    public func includedQuery(query: _SQLSelectQuery, leftSource: _SQLSource) -> (_SQLSelectQuery, _SQLSource) {
         var query = query
         query.source = _SQLSourceJoin(
             baseSource: query.source!,
@@ -82,17 +82,17 @@ extension OneToOneAssociation : Association {
 
 extension QueryInterfaceRequest {
     /// TODO: doc
-    public func join(associations: Association...) -> QueryInterfaceRequest<T> {
-        return join(associations)
+    public func include(associations: Association...) -> QueryInterfaceRequest<T> {
+        return include(associations)
     }
     
     /// TODO: doc
-    /// TODO: test that request.join([assoc1, assoc2]) <=> request.join([assoc1]).join([assoc2]) 
-    public func join(associations: [Association]) -> QueryInterfaceRequest<T> {
+    /// TODO: test that request.include([assoc1, assoc2]) <=> request.include([assoc1]).include([assoc2])
+    public func include(associations: [Association]) -> QueryInterfaceRequest<T> {
         var query = self.query
         let leftSource = query.source!.leftSourceForJoins
         for association in associations {
-            (query, _) = association.joinedQuery(query, leftSource: leftSource)
+            (query, _) = association.includedQuery(query, leftSource: leftSource)
         }
         return QueryInterfaceRequest(query: query)
     }

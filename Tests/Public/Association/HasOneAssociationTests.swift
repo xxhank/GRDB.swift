@@ -19,7 +19,7 @@ class HasOneAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "owner")
             let association = OneToOneAssociation(name: "owned", tableName: "owned", foreignKey: ["id": "ownerID"])
-            let request = rootTable.join(association)
+            let request = rootTable.include(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"owner\".*, \"owned\".* FROM \"owner\" LEFT JOIN \"owned\" ON \"owned\".\"ownerID\" = \"owner\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -63,7 +63,7 @@ class HasOneAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = OneToOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
-            let request = rootTable.join(association)
+            let request = rootTable.include(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend\" ON \"friend\".\"friendID\" = \"persons\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -108,7 +108,7 @@ class HasOneAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = OneToOneAssociation(name: "friend", tableName: "persons", foreignKey: ["id": "friendID"])
-            let request = rootTable.join(association.join(association))
+            let request = rootTable.include(association.include(association))
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend0\".*, \"friend1\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend0\" ON \"friend0\".\"friendID\" = \"persons\".\"id\" LEFT JOIN \"persons\" \"friend1\" ON \"friend1\".\"friendID\" = \"friend0\".\"id\"")
             
             let rows = dbQueue.inDatabase { db in

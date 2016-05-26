@@ -88,8 +88,8 @@ class ComplexAssociationTests: GRDBTestCase {
             
             dbQueue.inDatabase { db in
                 let request = Person.all()
-                    .join(Person.ruledCountry)
-                    .join(Person.birthCountry)
+                    .include(Person.ruledCountry)
+                    .include(Person.birthCountry)
                 
                 // TODO: sort persons using SQL
                 let persons = request.fetchAll(db).sort { $0.id < $1.id }
@@ -132,11 +132,11 @@ class ComplexAssociationTests: GRDBTestCase {
             
             dbQueue.inDatabase { db in
                 let request = Person.all()
-                    .join(Person.ruledCountry
-                        .join(Country.leader))
-                    .join(Person.birthCountry
-                        .join(Country.leader
-                            .join(Person.ruledCountry)))
+                    .include(Person.ruledCountry
+                        .include(Country.leader))
+                    .include(Person.birthCountry
+                        .include(Country.leader
+                            .include(Person.ruledCountry)))
                 
                 // TODO: sort persons using SQL
                 let persons = request.fetchAll(db).sort { $0.id < $1.id }

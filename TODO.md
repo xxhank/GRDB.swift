@@ -2,6 +2,7 @@
 – [ ] Associations: mandatory true/false (JOIN vs LEFT JOIN)
 – [ ] Associations: allow to give an alias, so that one can use an alias in an ORDER BY clause
 - [ ] Association: Type.join() instead of Type.all().join() See ComplexAssociationTests
+- [ ] Association: .include() adds a variant, .join() does not add a variant
 - [ ] FetchedRecordsController: document that identity comparison is only required for table view events.
 - [ ] FetchedRecordsController: see if we can replace identity comparison function with a function that returns an Equatable value (beware the generics trouble). See if this can help optimize memory use, and use a sortedMerge() algorithm.
 - [ ] GRDBCipher: remove limitations on iOS or OS X versions

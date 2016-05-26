@@ -19,7 +19,7 @@ class BelongsToAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "owned")
             let association = OneToOneAssociation(name: "owner", tableName: "owner", foreignKey: ["ownerID": "id"])
-            let request = rootTable.join(association)
+            let request = rootTable.include(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"owned\".*, \"owner\".* FROM \"owned\" LEFT JOIN \"owner\" ON \"owner\".\"id\" = \"owned\".\"ownerID\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -63,7 +63,7 @@ class BelongsToAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = OneToOneAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
-            let request = rootTable.join(association)
+            let request = rootTable.include(association)
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend\" ON \"friend\".\"id\" = \"persons\".\"friendID\"")
             
             let rows = dbQueue.inDatabase { db in
@@ -108,7 +108,7 @@ class BelongsToAssociationTests: GRDBTestCase {
             }
             let rootTable = QueryInterfaceRequest<Void>(tableName: "persons")
             let association = OneToOneAssociation(name: "friend", tableName: "persons", foreignKey: ["friendID": "id"])
-            let request = rootTable.join(association.join(association))
+            let request = rootTable.include(association.include(association))
             XCTAssertEqual(sql(dbQueue, request), "SELECT \"persons\".*, \"friend0\".*, \"friend1\".* FROM \"persons\" LEFT JOIN \"persons\" \"friend0\" ON \"friend0\".\"id\" = \"persons\".\"friendID\" LEFT JOIN \"persons\" \"friend1\" ON \"friend1\".\"id\" = \"friend0\".\"friendID\"")
             
             let rows = dbQueue.inDatabase { db in
